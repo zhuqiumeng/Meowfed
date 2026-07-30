@@ -1,0 +1,18 @@
+<view class="bottom-nav">
+  <view class="bottom-nav__item {{active === 'home' ? 'is-active' : ''}}" bindtap="goHome">
+    <image class="bottom-nav__icon" src="/assets/icons/phosphor-can.png" mode="aspectFit" />
+    <text>首页</text>
+  </view>
+
+  <view class="bottom-nav__add" bindtap="goAdd" aria-label="拍一款新品">
+    <view class="bottom-nav__add-orb">
+      <image class="bottom-nav__camera" src="/assets/icons/phosphor-camera.png" mode="aspectFit" />
+    </view>
+    <text>拍新品</text>
+  </view>
+
+  <view class="bottom-nav__item {{active === 'library' ? 'is-active' : ''}}" bindtap="goLibrary">
+    <image class="bottom-nav__icon" src="/assets/icons/phosphor-package.png" mode="aspectFit" />
+    <text>补货清单</text>
+  </view>
+</view>

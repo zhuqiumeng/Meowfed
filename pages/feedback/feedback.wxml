@@ -1,0 +1,78 @@
+<view wx:if="{{food}}" class="page-shell feedback-page">
+  <view class="topbar">
+    <view class="topbar__back" bindtap="goBack">返回</view>
+    <view class="feedback-page__title">这次表现如何？</view>
+    <view class="topbar__spacer"></view>
+  </view>
+
+  <view class="food-identity">
+    <view class="food-identity__visual" style="background: {{food.color}}">
+      <image wx:if="{{food.photoPath}}" mode="aspectFill" src="{{food.photoPath}}" />
+      <image wx:else mode="aspectFit" src="/assets/icons/phosphor-can.png" />
+    </view>
+    <view class="food-identity__copy">
+      <text class="food-identity__brand">{{food.brand}}</text>
+      <text class="food-identity__name">{{food.name}}</text>
+      <text class="food-identity__meta">{{food.flavor}} · {{food.texture}}</text>
+    </view>
+    <text class="food-identity__count">第 {{food.progress + 1}} 次</text>
+  </view>
+
+  <view class="prompt">
+    <text class="prompt__kicker">快速投票</text>
+    <text class="prompt__title">看它的行为，不只看剩多少</text>
+    <text class="prompt__hint">选最接近的一种就好，不用精确</text>
+  </view>
+
+  <view class="outcomes">
+    <view
+      wx:for="{{outcomes}}"
+      wx:key="key"
+      class="outcome outcome--{{item.tone}} {{selected === item.key ? 'is-selected' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="selectOutcome"
+    >
+      <image class="outcome__icon" src="{{item.iconPath}}" mode="aspectFit" />
+      <view class="outcome__copy">
+        <text class="outcome__label">{{item.label}}</text>
+        <text class="outcome__desc">{{item.description}}</text>
+      </view>
+      <view wx:if="{{selected === item.key}}" class="outcome__check">已选</view>
+    </view>
+  </view>
+
+  <view wx:if="{{selected === 'reluctant'}}" class="assist-box">
+    <text class="assist-box__title">它是哪种勉强？（选填）</text>
+    <view class="assist-box__chips">
+      <view
+        wx:for="{{assistedOptions}}"
+        wx:key="*this"
+        class="assist-chip {{assistedBy === item ? 'is-selected' : ''}}"
+        data-value="{{item}}"
+        bindtap="selectAssist"
+      >
+        {{item}}
+      </view>
+    </view>
+  </view>
+
+  <view class="note-field">
+    <text class="note-field__label">还有什么想记的？（选填）</text>
+    <textarea
+      class="note-field__input"
+      maxlength="120"
+      placeholder="例如：今天干粮也吃得少"
+      value="{{note}}"
+      bindinput="updateNote"
+    />
+  </view>
+
+  <button
+    class="primary-button submit-button"
+    disabled="{{!selected}}"
+    loading="{{submitting}}"
+    bindtap="submit"
+  >
+    记住这次投票
+  </button>
+</view>

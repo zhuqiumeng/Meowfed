@@ -1,0 +1,18 @@
+{
+  "appid": "touristappid",
+  "projectname": "猫吃了吗",
+  "description": "为挑食猫建立动态罐头试吃档案",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "./",
+  "setting": {
+    "useCompilerPlugins": false,
+    "es6": true,
+    "minified": true,
+    "postcss": true,
+    "urlCheck": false,
+    "checkInvalidKey": true,
+    "enhance": true,
+    "showShadowRootInWxmlPanel": true
+  },
+  "condition": {}
+}

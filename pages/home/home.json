@@ -1,0 +1,8 @@
+{
+  "usingComponents": {
+    "bottom-nav": "/components/bottom-nav/index",
+    "food-card": "/components/food-card/index"
+  },
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
+}

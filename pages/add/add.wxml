@@ -1,0 +1,101 @@
+<view class="page-shell add-page">
+  <view class="topbar">
+    <view class="topbar__back" bindtap="goBack">返回</view>
+    <view class="add-page__title">{{editing ? '完善罐头信息' : '认识一款新品'}}</view>
+    <view class="topbar__spacer"></view>
+  </view>
+
+  <view class="step-heading">
+    <text class="step-heading__kicker">第一步</text>
+    <text class="step-heading__title">先拍下包装</text>
+    <text class="step-heading__desc">照片就是最可靠的识别凭证</text>
+  </view>
+
+  <view class="photo-card {{photoPath ? 'has-photo' : ''}}" bindtap="choosePhoto">
+    <image wx:if="{{photoPath}}" class="photo-card__image" mode="aspectFill" src="{{photoPath}}" />
+    <view wx:else class="photo-card__empty">
+      <image class="photo-card__icon" src="/assets/icons/phosphor-camera.png" mode="aspectFit" />
+      <text class="photo-card__title">拍正面包装</text>
+      <text class="photo-card__hint">也可以从相册选择</text>
+      <text class="photo-card__action">打开相机</text>
+    </view>
+    <view wx:if="{{photoPath}}" class="photo-card__replace">重新拍</view>
+  </view>
+
+  <view class="recognition-note">
+    <image src="/assets/icons/phosphor-eyes.png" mode="aspectFit" />
+    <text>首版先用照片记住它。下面只填你认得的部分，之后仍可补充。</text>
+  </view>
+
+  <view class="step-heading step-heading--second">
+    <text class="step-heading__kicker">第二步</text>
+    <text class="step-heading__title">补一点线索</text>
+    <text class="step-heading__desc">品牌、口味和质地能帮你找到偏好规律</text>
+  </view>
+
+  <view class="form-card">
+    <label class="field">
+      <text class="field__label">品牌</text>
+      <input
+        class="field__input"
+        placeholder="例如 Catz Finefood"
+        value="{{brand}}"
+        data-field="brand"
+        bindinput="updateField"
+      />
+    </label>
+
+    <label class="field">
+      <text class="field__label">系列或名称</text>
+      <input
+        class="field__input"
+        placeholder="例如 鸡肉火鸡主食罐"
+        value="{{name}}"
+        data-field="name"
+        bindinput="updateField"
+      />
+    </label>
+
+    <label class="field">
+      <text class="field__label">口味 / 肉源</text>
+      <input
+        class="field__input"
+        placeholder="例如 鸡肉、火鸡"
+        value="{{flavor}}"
+        data-field="flavor"
+        bindinput="updateField"
+      />
+    </label>
+
+    <view class="form-row">
+      <label class="field field--half">
+        <text class="field__label">质地</text>
+        <picker range="{{textureOptions}}" value="{{textureIndex}}" bindchange="changeTexture">
+          <view class="field__picker">{{textureOptions[textureIndex]}}</view>
+        </picker>
+      </label>
+
+      <label class="field field--half">
+        <text class="field__label">这次买了</text>
+        <picker range="{{quantityOptions}}" value="{{quantityIndex}}" bindchange="changeQuantity">
+          <view class="field__picker">{{quantityOptions[quantityIndex]}}</view>
+        </picker>
+      </label>
+    </view>
+
+    <label class="field field--last">
+      <text class="field__label">国家（选填）</text>
+      <input
+        class="field__input"
+        placeholder="例如 德国"
+        value="{{country}}"
+        data-field="country"
+        bindinput="updateField"
+      />
+    </label>
+  </view>
+
+  <button class="primary-button save-button" loading="{{saving}}" bindtap="save">
+    {{editing ? '保存修改' : '加入试吃清单'}}
+  </button>
+</view>

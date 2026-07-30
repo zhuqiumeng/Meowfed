@@ -1,0 +1,10 @@
+node_modules/
+audits/
+.playwright-cli/
+artifacts/
+design-audit-*/
+output/
+design-qa*.png
+design-qa.md
+.DS_Store
+*.tgz

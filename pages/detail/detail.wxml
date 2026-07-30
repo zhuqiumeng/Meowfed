@@ -1,0 +1,137 @@
+<view wx:if="{{food}}" class="page-shell detail-page">
+  <view class="topbar detail-topbar">
+    <view class="topbar__back" bindtap="goBack">返回</view>
+    <view class="detail-topbar__status status--{{food.status.tone}}">
+      {{food.status.label}}
+    </view>
+    <view class="icon-button detail-topbar__edit" bindtap="edit">编辑</view>
+  </view>
+
+  <view class="detail-visual" style="background-color: {{food.color}}">
+    <image wx:if="{{food.photoPath}}" class="detail-visual__image" mode="aspectFill" src="{{food.photoPath}}" />
+    <image wx:else class="detail-visual__can" mode="aspectFit" src="/assets/icons/phosphor-can.png" />
+    <view class="detail-visual__sticker">{{food.country || '海外罐头'}}</view>
+  </view>
+
+  <view class="detail-copy">
+    <text class="detail-copy__brand">{{food.brand}}</text>
+    <text class="detail-copy__name">{{food.name}}</text>
+    <view class="detail-copy__tags">
+      <text>{{food.flavor}}</text>
+      <text>{{food.texture}}</text>
+      <text>试买 {{food.quantityBought}} 罐</text>
+    </view>
+  </view>
+
+  <view wx:if="{{food.status.key === 'trial'}}" class="qualification">
+    <view class="qualification__header">
+      <view>
+        <text class="qualification__eyebrow">长期回购考核</text>
+        <text class="qualification__title">
+          {{food.progress === 2 ? '再一次好反馈就入选' : '积累 3 次好反馈'}}
+        </text>
+      </view>
+      <text class="qualification__score">{{food.progress}}/3</text>
+    </view>
+    <view class="qualification__dots">
+      <view
+        wx:for="{{progressDots}}"
+        wx:key="*this"
+        class="qualification__dot {{item < food.progress ? 'is-filled' : ''}}"
+      >
+        {{item < food.progress ? '好反馈' : '待观察'}}
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{food.status.key === 'repurchase'}}" class="status-banner status-banner--mint">
+    <image src="/assets/icons/phosphor-heart.png" mode="aspectFit" />
+    <view>
+      <text class="status-banner__title">已经通过三次验证</text>
+      <text class="status-banner__text">补货时可以把它放进放心买清单</text>
+    </view>
+  </view>
+
+  <view wx:elif="{{food.status.key === 'observe'}}" class="status-banner status-banner--yellow">
+    <image src="/assets/icons/phosphor-eyes.png" mode="aspectFit" />
+    <view>
+      <text class="status-banner__title">以前喜欢，最近有点降温</text>
+      <text class="status-banner__text">
+        已连续 {{food.recentNegativeCount}} 次反馈偏低，再观察几次由你决定
+      </text>
+    </view>
+  </view>
+
+  <view wx:elif="{{food.status.key === 'consume'}}" class="status-banner status-banner--gray">
+    <image src="/assets/icons/phosphor-package.png" mode="aspectFit" />
+    <view>
+      <text class="status-banner__title">现有库存可以慢慢吃</text>
+      <text class="status-banner__text">有其他选择时，不建议主动补货</text>
+    </view>
+  </view>
+
+  <view wx:elif="{{food.status.key === 'avoid'}}" class="status-banner status-banner--dark">
+    <image src="/assets/icons/phosphor-prohibit.png" mode="aspectFit" />
+    <view>
+      <text class="status-banner__title">主子投出了强烈反对票</text>
+      <text class="status-banner__text">已经放进埋屎避雷，别重复踩雷</text>
+    </view>
+  </view>
+
+  <view wx:elif="{{food.status.key === 'paused'}}" class="status-banner status-banner--gray">
+    <image src="/assets/icons/phosphor-package.png" mode="aspectFit" />
+    <view>
+      <text class="status-banner__title">当前暂停回购</text>
+      <text class="status-banner__text">历史还在，想再试时随时恢复观察</text>
+    </view>
+  </view>
+
+  <button class="primary-button record-button" bindtap="record">
+    记录这次表现
+  </button>
+
+  <button
+    wx:if="{{food.shouldSuggestPause}}"
+    class="secondary-button pause-button"
+    bindtap="pauseBuying"
+  >
+    最近一直不吃，暂停回购
+  </button>
+
+  <button
+    wx:if="{{food.status.key === 'paused'}}"
+    class="secondary-button pause-button"
+    bindtap="resumeTrial"
+  >
+    重新放回观察
+  </button>
+
+  <view class="section">
+    <view class="section__header">
+      <view>
+        <text class="section__title">主子的投票记录</text>
+        <text class="section__hint">保留变化，不用一次定终身</text>
+      </view>
+    </view>
+
+    <view wx:if="{{history.length}}" class="history-card">
+      <view wx:for="{{history}}" wx:key="id" class="history-item">
+        <image class="history-item__icon" src="{{item.iconPath}}" mode="aspectFit" />
+        <view class="history-item__copy">
+          <text class="history-item__title">{{item.outcomeInfo.label}}</text>
+          <text wx:if="{{item.assistedBy}}" class="history-item__assist">{{item.assistedBy}}</text>
+          <text wx:if="{{item.note}}" class="history-item__note">{{item.note}}</text>
+        </view>
+        <text class="history-item__date">{{item.dateText}}</text>
+      </view>
+    </view>
+
+    <view wx:else class="empty-state card">
+      <image class="empty-state__icon" src="/assets/icons/phosphor-can.png" mode="aspectFit" />
+      <view class="empty-state__title">还没有第一次投票</view>
+      <view class="empty-state__text">等它吃过后，回来点一下真实表现</view>
+    </view>
+  </view>
+
+  <view class="delete-link" bindtap="remove">删除这款罐头</view>
+</view>
