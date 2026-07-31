@@ -46,6 +46,7 @@ const DEMO_FOODS = [
     id: "demo-catz",
     brand: "Catz Finefood",
     name: "鸡肉火鸡主食罐",
+    specification: "85g",
     foodType: "staple_can",
     flavor: "鸡肉 · 火鸡",
     texture: "肉泥",
@@ -61,6 +62,7 @@ const DEMO_FOODS = [
     id: "demo-oasy",
     brand: "Oasy",
     name: "吞拿鱼慕斯",
+    specification: "70g",
     foodType: "snack_can",
     flavor: "吞拿鱼",
     texture: "慕斯",
@@ -75,6 +77,7 @@ const DEMO_FOODS = [
     id: "demo-venandi",
     brand: "Venandi",
     name: "火鸡单一蛋白罐",
+    specification: "200g",
     foodType: "staple_can",
     flavor: "火鸡",
     texture: "细肉泥",
@@ -91,6 +94,7 @@ const DEMO_FOODS = [
     id: "demo-freeze",
     brand: "K9 Natural",
     name: "羊肉冻干",
+    specification: "100g",
     foodType: "freeze_dried",
     flavor: "羊肉",
     texture: "冻干块",
@@ -102,6 +106,7 @@ const DEMO_FOODS = [
     id: "demo-bury",
     brand: "Mjamjam",
     name: "多汁牛肉罐",
+    specification: "200g",
     foodType: "staple_can",
     flavor: "牛肉",
     texture: "粗肉泥",
@@ -207,7 +212,7 @@ function writeCatProfile(profile) {
 }
 
 function formatCatNickname(nickname) {
-  return nickname || "昵称待补充";
+  return nickname || "噜噜";
 }
 
 function ensureInitialized() {
@@ -261,6 +266,13 @@ function formatDate(timestamp) {
     month: "2-digit",
     day: "2-digit"
   }).format(new Date(timestamp));
+}
+
+function formatCardDate(timestamp) {
+  const date = new Date(timestamp);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${month}-${day}`;
 }
 
 function image(src, className, alt = "") {
@@ -337,35 +349,43 @@ function foodRow(food, options = {}) {
 }
 
 function recentFoodCard(food) {
-  const composition =
-    [food.flavor, food.texture].filter(Boolean).join(" · ") || "构成待补充";
-  const feedback = food.latestOutcome?.shortLabel || "待反馈";
   const feedbackKey = food.latestResult?.outcome || "unknown";
-  const eatenAt = food.latestResult?.createdAt || 0;
+  const feedbackLabels = {
+    eager: "主动吃",
+    okay: "正常接受",
+    reluctant: "勉强吃",
+    bury: "埋屎",
+    unknown: "没法判断"
+  };
+  const feedback = feedbackLabels[feedbackKey] || feedbackLabels.unknown;
+  const recordedAt = food.latestResult?.createdAt || food.createdAt;
+  const title = [
+    food.brand || "品牌待补充",
+    food.name || "未命名食物",
+    food.specification || ""
+  ]
+    .filter(Boolean)
+    .join(" ");
   const media = food.photoPath
     ? `<img class="photo" src="${escapeHtml(food.photoPath)}" alt="${escapeHtml(`${food.name}包装`)}" data-image-fallback />`
     : uiIcon("cat", "cat-fallback", "猫猫头占位图");
 
   return `
     <button class="recent-food-card" data-food="${escapeHtml(food.id)}">
-      <span class="recent-card-media">${media}</span>
+      <span class="recent-card-media ${food.photoPath ? "has-photo" : "is-fallback"}">${media}</span>
       <span class="recent-card-body">
-        <strong class="recent-card-title">
-          <span>${escapeHtml(food.brand || "品牌待补充")}</span>
-          <span aria-hidden="true">｜</span>
-          <span>${escapeHtml(food.name || "未命名食物")}</span>
-        </strong>
+        <strong class="recent-card-title">${escapeHtml(title)}</strong>
         <small class="recent-card-meta">
-          <span>${escapeHtml(FOOD_TYPES[food.foodType] || "其他")}</span>
-          <span aria-hidden="true">｜</span>
-          <span>${escapeHtml(composition)}</span>
+          <span class="recent-card-type">${escapeHtml(FOOD_TYPES[food.foodType] || "其他")}</span>
+          <span class="recent-card-divider" aria-hidden="true">｜</span>
+          <span>${escapeHtml(food.texture || "质地待补充")}</span>
+          <span class="recent-card-divider" aria-hidden="true">｜</span>
+          <span>${escapeHtml(food.flavor || "肉类待补充")}</span>
         </small>
-        ${
-          eatenAt
-            ? `<time class="recent-card-time" datetime="${new Date(eatenAt).toISOString()}">${formatDate(eatenAt)} 吃过</time>`
-            : `<span class="recent-card-time">还没记录吃过</span>`
-        }
-        <span class="recent-feedback-tag feedback-${feedbackKey}">${escapeHtml(feedback)}</span>
+        <span class="recent-card-feedback-row">
+          <span class="recent-feedback-tag feedback-${feedbackKey}">${escapeHtml(feedback)}</span>
+          <time class="recent-card-time" datetime="${new Date(recordedAt).toISOString()}">${formatCardDate(recordedAt)}</time>
+        </span>
       </span>
     </button>
   `;
@@ -393,29 +413,43 @@ function topbar(title, options = {}) {
   `;
 }
 
+function navStateIcon(key, active) {
+  const iconNames = {
+    home: "home",
+    record: "add",
+    library: "can"
+  };
+  const stateName = active ? "active" : "default";
+
+  return `<img class="nav-state-icon" src="/assets/icons/nav-${iconNames[key]}-${stateName}.svg" alt="" />`;
+}
+
 function bottomNav(active) {
   const items = [
-    ["home", "home", "首页"],
-    ["record", "add", "立即记录"],
-    ["library", "list", "补货清单"]
+    ["home", "首页"],
+    ["record", "添加记录"],
+    ["library", "清单"]
   ];
 
   return `
     <nav class="bottom-nav" aria-label="主导航">
       ${items
-        .map(([key, icon, label]) => {
+        .map(([key, label]) => {
+          const selected = active === key || (key === "record" && state.pickerOpen);
+
           if (key === "record") {
             return `
               <button
-                class="nav-item nav-item-record"
+                class="nav-item nav-item-record ${selected ? "active" : ""}"
                 type="button"
                 data-open-picker
                 data-record-trigger="nav"
                 aria-haspopup="dialog"
-                aria-label="立即记录食物"
+                aria-label="添加记录"
+                aria-pressed="${selected}"
               >
                 <span class="nav-icon-shell" aria-hidden="true">
-                  ${uiIcon(icon, "nav-icon")}
+                  ${navStateIcon(key, selected)}
                 </span>
                 <span>${label}</span>
               </button>
@@ -423,9 +457,9 @@ function bottomNav(active) {
           }
 
           return `
-            <button class="nav-item nav-item-${key} ${active === key ? "active" : ""}" data-nav="${key}" ${active === key ? 'aria-current="page"' : ""}>
+            <button class="nav-item nav-item-${key} ${selected ? "active" : ""}" data-nav="${key}" ${selected ? 'aria-current="page"' : ""}>
               <span class="nav-icon-shell" aria-hidden="true">
-                ${uiIcon(icon, "nav-icon")}
+                ${navStateIcon(key, selected)}
               </span>
               <span>${label}</span>
             </button>
@@ -438,36 +472,30 @@ function bottomNav(active) {
 
 function home() {
   const foods = listFoods();
-  const recent = foods.slice(0, 5);
-  const attention = foods.filter((food) =>
-    ["observe", "stale", "avoid"].includes(food.status.key)
-  );
-  const buyCount = foods.filter((food) => food.status.key === "repurchase").length;
+  const catProfile = readCatProfile();
+  const nickname = formatCatNickname(catProfile.nickname);
+  const leftColumn = foods.filter((_, index) => index % 2 === 0);
+  const rightColumn = foods.filter((_, index) => index % 2 === 1);
 
   return `
     <main class="screen home-screen">
-      <section class="home-first-view">
-        ${topbar("", { brand: true })}
+      <section class="home-feed">
+        <h1 class="home-greeting">
+          <span>Hi ${escapeHtml(nickname)}</span>
+          <span>这次吃的怎么样？</span>
+        </h1>
 
-        <section class="page-intro">
-          <h1>这次吃得怎么样？</h1>
-        </section>
-
-        <section class="home-recent">
-          <div class="section-heading">
-            <h2>最近记录</h2>
-            ${foods.length ? `<button class="text-button" data-nav="library">查看全部</button>` : ""}
-          </div>
+        <section class="home-recent" aria-labelledby="recent-records-title">
+          <h2 class="home-recent-heading" id="recent-records-title">最近记录</h2>
           ${
             foods.length
               ? `
-                <div class="recent-carousel" data-recent-carousel aria-label="最近记录，横向滑动查看更多">
-                  ${recent.map(recentFoodCard).join("")}
-                  <button class="recent-more-card" data-nav="library">
-                    <span data-recent-pull-label>再拉一下</span>
-                    <strong>查看全部</strong>
-                    <small>${foods.length} 款食物</small>
-                  </button>
+                <div class="recent-food-grid" aria-label="最近记录，越近添加的越靠前">
+                  <div class="recent-food-column">${leftColumn.map(recentFoodCard).join("")}</div>
+                  <div class="recent-food-column">${rightColumn.map(recentFoodCard).join("")}</div>
+                </div>
+                <div class="home-feed-end" role="note" aria-label="已经到底了哟">
+                  <span></span><strong>已经到底了哟</strong><span></span>
                 </div>
               `
               : `
@@ -482,37 +510,6 @@ function home() {
               `
           }
         </section>
-
-        ${
-          foods.length
-            ? `
-              <section class="home-summary" aria-label="食物状态概览">
-                <button class="summary-row" data-nav="library">
-                  ${uiIcon(attention.length ? "eye" : "heart", "summary-icon")}
-                  <span class="summary-copy">
-                    <strong>${attention.length ? `${attention.length} 款需要留意` : "最近状态比较稳定"}</strong>
-                    <small>${attention.length ? "包括观察、待复验和避雷" : "补货前再打开清单确认"}</small>
-                  </span>
-                  <span class="summary-value">${buyCount} 款放心买</span>
-                </button>
-              </section>
-            `
-            : ""
-        }
-
-        <div class="record-zone">
-          <p class="record-prompt">刚刚喂过？</p>
-          <section class="record-actions" aria-label="立即记录">
-            <button class="record-card accent" data-nav="add">
-              <span class="record-card-icon-shell">${uiIcon("camera", "record-card-icon")}</span>
-              <span class="record-card-copy"><strong>拍新品</strong><small>第一次只记包装和类型</small></span>
-            </button>
-            <button class="record-card" data-open-picker data-record-trigger="home-existing" aria-haspopup="dialog">
-              <span class="record-card-icon-shell">${uiIcon("box", "record-card-icon")}</span>
-              <span class="record-card-copy"><strong>记已有食物</strong><small>选一款，点一下表现</small></span>
-            </button>
-          </section>
-        </div>
       </section>
     </main>
     ${bottomNav("home")}
@@ -745,6 +742,10 @@ function addFoodView() {
           <label class="field">
             <span>系列或名称</span>
             <input name="name" value="${escapeHtml(editing?.name || "")}" placeholder="例如 鸡肉火鸡主食罐" />
+          </label>
+          <label class="field">
+            <span>规格</span>
+            <input name="specification" value="${escapeHtml(editing?.specification || "")}" placeholder="例如 85g" />
           </label>
           <label class="field">
             <span>口味 / 肉源</span>
@@ -1176,6 +1177,7 @@ function submitFood(form) {
     id: existing?.id || createId("food"),
     brand: brand || "品牌待补充",
     name: name || "未命名食物",
+    specification: String(data.get("specification") || "").trim(),
     foodType: String(data.get("foodType") || "other"),
     flavor: String(data.get("flavor") || "").trim(),
     texture: String(data.get("texture") || "其他"),
@@ -1293,6 +1295,9 @@ function bindImageFallback(root = document) {
 
         element.removeAttribute("data-image-fallback");
         element.classList.remove("photo");
+        const recentMedia = element.closest(".recent-card-media");
+        recentMedia?.classList.remove("has-photo");
+        recentMedia?.classList.add("is-fallback");
         element.src = ICONS.cat;
         element.classList.add("cat-fallback-image");
         element.alt = "猫猫头占位图";
@@ -1300,101 +1305,6 @@ function bindImageFallback(root = document) {
       { once: true }
     );
   });
-}
-
-function bindRecentCarousel() {
-  const carousel = document.querySelector("[data-recent-carousel]");
-  if (!carousel) return;
-
-  const pullLabel = carousel.querySelector("[data-recent-pull-label]");
-  const threshold = 48;
-  let armed = false;
-  let startX = 0;
-  let startY = 0;
-  let distance = 0;
-  let suppressClick = false;
-
-  const isAtEnd = () =>
-    carousel.scrollWidth - carousel.clientWidth - carousel.scrollLeft <= 2;
-
-  const resetPull = () => {
-    armed = false;
-    distance = 0;
-    carousel.classList.remove("pull-ready");
-    carousel.style.setProperty("--recent-pull-offset", "0px");
-    if (pullLabel) pullLabel.textContent = "再拉一下";
-  };
-
-  carousel.addEventListener(
-    "touchstart",
-    (event) => {
-      if (event.touches.length !== 1 || !isAtEnd()) return;
-      armed = true;
-      startX = event.touches[0].clientX;
-      startY = event.touches[0].clientY;
-    },
-    { passive: true }
-  );
-
-  carousel.addEventListener(
-    "touchmove",
-    (event) => {
-      if (!armed || event.touches.length !== 1) return;
-      const deltaX = startX - event.touches[0].clientX;
-      const deltaY = startY - event.touches[0].clientY;
-      if (deltaX <= 0 || deltaX < Math.abs(deltaY)) return;
-
-      distance = deltaX;
-      suppressClick = distance > 8;
-      carousel.classList.toggle("pull-ready", distance >= threshold);
-      carousel.style.setProperty(
-        "--recent-pull-offset",
-        `${-Math.min(distance / 4, 14)}px`
-      );
-      if (pullLabel) {
-        pullLabel.textContent = distance >= threshold ? "松开进入" : "再拉一下";
-      }
-      if (distance > 8) event.preventDefault();
-    },
-    { passive: false }
-  );
-
-  carousel.addEventListener(
-    "touchend",
-    (event) => {
-      const shouldOpen = armed && distance >= threshold;
-      const shouldSuppressClick = suppressClick;
-      resetPull();
-      if (shouldOpen) {
-        event.preventDefault();
-        route("library");
-      } else if (shouldSuppressClick) {
-        window.setTimeout(() => {
-          suppressClick = false;
-        }, 350);
-      }
-    },
-    { passive: false }
-  );
-
-  carousel.addEventListener(
-    "touchcancel",
-    () => {
-      resetPull();
-      suppressClick = false;
-    },
-    { passive: true }
-  );
-  carousel.addEventListener(
-    "click",
-    (event) => {
-      if (!suppressClick) return;
-      event.preventDefault();
-      event.stopPropagation();
-      suppressClick = false;
-    },
-    true
-  );
 }
 
 function bindEvents() {
@@ -1545,7 +1455,6 @@ function bindEvents() {
   });
 
   bindFoodLinks();
-  bindRecentCarousel();
 
   document.querySelectorAll("[data-outcome]").forEach((element) => {
     element.addEventListener("click", () => {

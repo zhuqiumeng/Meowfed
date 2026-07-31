@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { readFileSync } = require("node:fs");
+const { existsSync, readFileSync } = require("node:fs");
 const { join } = require("node:path");
 
 const source = readFileSync(
@@ -16,9 +16,10 @@ const previewServer = readFileSync(
   "utf8"
 );
 
-test("首页始终提供最近记录空状态", () => {
-  assert.match(source, /<h2>最近记录<\/h2>/);
+test("首页始终提供最近记录信息流与空状态", () => {
+  assert.match(source, /id="recent-records-title">最近记录<\/h2>/);
   assert.match(source, /还没有最近记录/);
+  assert.match(source, /已经到底了哟/);
 });
 
 test("一级页面和最近区块不展示副标题", () => {
@@ -36,32 +37,79 @@ test("食物照片缺失或加载失败时使用猫猫头", () => {
   assert.match(source, /phosphor-cat-thin\.svg/);
 });
 
-test("立即记录入口固定在首屏偏下的单手操作区", () => {
-  assert.match(source, /<section class="home-first-view">/);
-  assert.match(styles, /\.record-zone\s*\{[\s\S]*margin-top: auto/);
-  assert.match(source, /刚刚喂过？/);
-  assert.match(styles, /100svh/);
-});
-
-test("最近记录使用最多五张横向卡片并保留查看全部入口", () => {
-  const recentPosition = source.indexOf('class="home-recent"');
-  const summaryPosition = source.indexOf('class="home-summary"');
-  const recordPosition = source.indexOf('class="record-zone"');
-
-  assert.ok(recentPosition >= 0);
-  assert.ok(recentPosition < summaryPosition);
-  assert.ok(summaryPosition < recordPosition);
-  assert.match(source, /foods\.slice\(0, 5\)/);
-  assert.match(source, /class="recent-food-card"/);
-  assert.match(source, /class="recent-card-media"/);
-  assert.match(source, /class="recent-feedback-tag/);
-  assert.match(source, /data-recent-carousel/);
-  assert.match(source, /const threshold = 48/);
-  assert.match(styles, /\.recent-carousel\s*\{[\s\S]*overflow-x: auto/);
-  assert.match(styles, /scroll-snap-type: x proximity/);
+test("首页问候读取用户设置的猫猫昵称", () => {
+  assert.match(source, /const catProfile = readCatProfile\(\)/);
+  assert.match(source, /const nickname = formatCatNickname\(catProfile\.nickname\)/);
+  assert.match(source, /<span>Hi \$\{escapeHtml\(nickname\)\}<\/span>/);
+  assert.match(source, /<span>这次吃的怎么样？<\/span>/);
+  assert.match(source, /return nickname \|\| "噜噜"/);
   assert.match(
     styles,
-    /\.recent-food-card\s*\{[\s\S]*width: calc\(43\.4783% - 0\.87px\);[\s\S]*flex-basis: calc\(43\.4783% - 0\.87px\)/
+    /\.home-greeting\s*\{[\s\S]*margin: 32px 0 16px;[\s\S]*color: #1a1a1a;[\s\S]*font-size: 28px;[\s\S]*font-weight: 500/
+  );
+});
+
+test("最近记录按时间排序并使用双列九像素信息流", () => {
+  assert.match(source, /const leftColumn = foods\.filter\(\(_, index\) => index % 2 === 0\)/);
+  assert.match(source, /const rightColumn = foods\.filter\(\(_, index\) => index % 2 === 1\)/);
+  assert.match(source, /class="recent-food-grid"/);
+  assert.match(source, /class="recent-food-column"/);
+  assert.match(source, /class="recent-food-card"/);
+  assert.match(source, /class="recent-card-media /);
+  assert.match(source, /class="recent-feedback-tag/);
+  assert.match(
+    styles,
+    /\.recent-food-grid\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*gap: 9px/
+  );
+  assert.match(
+    styles,
+    /\.recent-food-column\s*\{[\s\S]*flex-direction: column;[\s\S]*gap: 9px/
+  );
+});
+
+test("首页食品卡遵循图片、标题、相关点、反馈和日期规格", () => {
+  assert.match(source, /food\.specification \|\| ""/);
+  assert.match(source, /name="specification"/);
+  assert.match(source, /specification: String\(data\.get\("specification"\)/);
+  assert.match(source, /FOOD_TYPES\[food\.foodType\]/);
+  assert.match(source, /food\.texture \|\| "质地待补充"/);
+  assert.match(source, /food\.flavor \|\| "肉类待补充"/);
+  assert.match(source, /eager: "主动吃"/);
+  assert.match(source, /okay: "正常接受"/);
+  assert.match(source, /unknown: "没法判断"/);
+  assert.match(source, /formatCardDate\(recordedAt\)/);
+  assert.match(
+    styles,
+    /\.home-screen \.recent-card-media\.is-fallback\s*\{[\s\S]*height: 140px/
+  );
+  assert.match(
+    styles,
+    /\.home-screen \.recent-card-media\.has-photo img\.photo\s*\{[\s\S]*width: 100%;[\s\S]*height: auto/
+  );
+  assert.match(
+    styles,
+    /\.home-screen \.recent-card-body\s*\{[\s\S]*padding: 9px/
+  );
+  assert.match(
+    styles,
+    /\.home-screen \.recent-card-title\s*\{[\s\S]*font-size: 14px;[\s\S]*font-weight: 500;[\s\S]*-webkit-line-clamp: 2/
+  );
+  assert.match(
+    styles,
+    /\.home-screen \.recent-card-meta\s*\{[\s\S]*margin: 0 0 9px;[\s\S]*color: #808080;[\s\S]*font-size: 11px/
+  );
+  assert.match(styles, /\.home-screen \.recent-card-type\s*\{[\s\S]*color: #0088df/);
+  assert.match(
+    styles,
+    /\.home-screen \.recent-feedback-tag\s*\{[\s\S]*height: 18px;[\s\S]*padding: 0 6px;[\s\S]*border-radius: 3px;[\s\S]*font-size: 11px/
+  );
+  assert.match(styles, /\.home-screen \.feedback-eager\s*\{[\s\S]*color: #00b740/);
+  assert.match(styles, /\.home-screen \.feedback-okay\s*\{[\s\S]*color: #009bff/);
+  assert.match(styles, /\.home-screen \.feedback-reluctant\s*\{[\s\S]*color: #ffb51c/);
+  assert.match(styles, /\.home-screen \.feedback-bury\s*\{[\s\S]*color: #ff3133/);
+  assert.match(
+    styles,
+    /\.home-screen \.recent-card-time\s*\{[\s\S]*color: #4d4d4d;[\s\S]*font-size: 12px/
   );
 });
 
@@ -186,27 +234,44 @@ test("普通组件不使用外投影，只给头像和浮层保留轻量高度",
 });
 
 test("底部导航使用统一线描图标、全局记录动作和独立安全区", () => {
-  assert.match(source, /\["home", "home", "首页"\]/);
-  assert.match(source, /\["record", "add", "立即记录"\]/);
-  assert.match(source, /\["library", "list", "补货清单"\]/);
+  assert.match(source, /\["home", "首页"\]/);
+  assert.match(source, /\["record", "添加记录"\]/);
+  assert.match(source, /\["library", "清单"\]/);
   assert.doesNotMatch(source, /<svg/);
   assert.doesNotMatch(source, /function recordHub\(\)/);
   assert.doesNotMatch(source, /record: recordHub/);
   assert.match(source, /data-record-trigger="nav"/);
-  assert.match(source, /aria-label="立即记录食物"/);
+  assert.match(source, /aria-label="添加记录"/);
   assert.match(source, /data-nav="\$\{key\}"/);
   assert.match(source, /data-open-picker/);
+  assert.match(source, /function navStateIcon\(key, active\)/);
+  assert.match(source, /nav-\$\{iconNames\[key\]\}-\$\{stateName\}\.svg/);
+  assert.match(source, /key === "record" && state\.pickerOpen/);
   assert.match(styles, /--nav-content-height: 48px/);
-  assert.match(styles, /--nav-active: #34c759/);
+  assert.match(styles, /--nav-active: #4571fc/);
   assert.match(
     styles,
-    /\.bottom-nav\s*\{[\s\S]*min-height: calc\(48px \+ env\(safe-area-inset-bottom\)\)/
+    /\/\* Bottom navigation · 390 × 48 reference plus the device safe area\.[\s\S]*\.bottom-nav\s*\{[\s\S]*height: calc\(var\(--nav-content-height\) \+ env\(safe-area-inset-bottom\)\);[\s\S]*padding: 0 0 env\(safe-area-inset-bottom\);[\s\S]*background: #f7f7f7;[\s\S]*box-shadow: inset 0 0\.5px 0 #e6e6e6/
   );
-  assert.match(styles, /\.icon-home\s*\{[\s\S]*ddmc-home\.svg/);
-  assert.match(styles, /\.icon-add\s*\{[\s\S]*ddmc-add\.svg/);
-  assert.match(styles, /\.icon-list\s*\{[\s\S]*ddmc-list\.svg/);
-  assert.match(styles, /\.nav-item\.active \.nav-icon-shell\s*\{[\s\S]*background: var\(--lime-soft\)/);
-  assert.match(styles, /\.nav-icon-shell,[\s\S]*border-radius: 8px/);
+  assert.match(
+    styles,
+    /\/\* Bottom navigation · 390 × 48 reference plus the device safe area\.[\s\S]*\.nav-item,[\s\S]*color: #4d4d4d;[\s\S]*font-size: 11px;[\s\S]*line-height: 14px/
+  );
+  assert.match(
+    styles,
+    /\/\* Bottom navigation · 390 × 48 reference plus the device safe area\.[\s\S]*\.nav-item\.active,[\s\S]*color: #4571fc/
+  );
+  assert.match(styles, /\.nav-state-icon\s*\{[\s\S]*height: 32px/);
+  [
+    "nav-home-active.svg",
+    "nav-home-default.svg",
+    "nav-add-active.svg",
+    "nav-add-default.svg",
+    "nav-can-active.svg",
+    "nav-can-default.svg"
+  ].forEach((file) => {
+    assert.ok(existsSync(join(__dirname, "..", "assets", "icons", file)));
+  });
   assert.match(previewServer, /"\.svg": "image\/svg\+xml; charset=utf-8"/);
 });
 
