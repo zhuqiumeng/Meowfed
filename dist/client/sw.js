@@ -1,8 +1,8 @@
-const CACHE_NAME = "cat-eat-h5-v8";
+const CACHE_NAME = "cat-eat-h5-v9";
 const APP_ASSETS = [
   "/?screen=home",
-  "/preview.css?v=8",
-  "/preview.js?v=8",
+  "/preview.css?v=9",
+  "/preview.js?v=9",
   "/utils/rules.js",
   "/manifest.webmanifest",
   "/assets/cat-profile-default.jpg",
@@ -21,7 +21,13 @@ const APP_ASSETS = [
   "/assets/icons/ddmc-search.svg",
   "/assets/icons/ddmc-clock.svg",
   "/assets/icons/app-icon-192.png",
-  "/assets/icons/app-icon-512.png"
+  "/assets/icons/app-icon-512.png",
+  "/assets/icons/nav-home-active.svg",
+  "/assets/icons/nav-home-default.svg",
+  "/assets/icons/nav-add-active.svg",
+  "/assets/icons/nav-add-default.svg",
+  "/assets/icons/nav-can-active.svg",
+  "/assets/icons/nav-can-default.svg"
 ];
 
 self.addEventListener("install", (event) => {

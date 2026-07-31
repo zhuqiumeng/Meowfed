@@ -4,7 +4,7 @@
   --app-max-width: 480px;
   --screen-gutter: 16px;
   --nav-content-height: 48px;
-  --nav-active: #34c759;
+  --nav-active: #4571fc;
   --ink: #17202a;
   --muted: #667085;
   --subtle: #98a2b3;
@@ -35,6 +35,7 @@
 html {
   min-height: 100%;
   background: #f2f3f7;
+  scrollbar-width: none;
 }
 
 body {
@@ -47,6 +48,10 @@ body {
     -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+body::-webkit-scrollbar {
+  display: none;
 }
 
 button,
@@ -3997,5 +4002,302 @@ button:active {
 @media (prefers-reduced-motion: reduce) {
   .record-picker-sheet {
     transition: none;
+  }
+}
+
+/* Bottom navigation · 390 × 48 reference plus the device safe area. */
+.bottom-nav {
+  height: calc(var(--nav-content-height) + env(safe-area-inset-bottom));
+  min-height: calc(var(--nav-content-height) + env(safe-area-inset-bottom));
+  padding: 0 0 env(safe-area-inset-bottom);
+  border: 0;
+  border-radius: 0;
+  background: #f7f7f7;
+  box-shadow: inset 0 0.5px 0 #e6e6e6;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.nav-item,
+.nav-item-record {
+  height: var(--nav-content-height);
+  min-height: var(--nav-content-height);
+  gap: 0;
+  padding: 1px 0;
+  border-radius: 0;
+  background: transparent;
+  color: #4d4d4d;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+}
+
+.nav-item.active,
+.nav-item-record.active {
+  color: #4571fc;
+  font-weight: 400;
+}
+
+.nav-icon-shell,
+.nav-item-record .nav-icon-shell,
+.nav-item.active .nav-icon-shell {
+  width: 33px;
+  height: 32px;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.nav-state-icon {
+  width: auto;
+  max-width: 33px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid rgba(69, 113, 252, 0.36);
+  outline-offset: -3px;
+}
+
+/* Home feed · 390px reference. */
+.home-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding:
+    env(safe-area-inset-top)
+    16px
+    calc(var(--nav-content-height) + 32px + env(safe-area-inset-bottom));
+}
+
+.home-feed {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.home-greeting {
+  margin: 32px 0 16px;
+  color: #1a1a1a;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.56px;
+  line-height: 1.28;
+}
+
+.home-greeting span {
+  display: block;
+}
+
+.home-screen .home-recent {
+  display: block;
+  margin: 0;
+}
+
+.home-recent-heading {
+  margin: 9px 0;
+  color: #1a1a1a;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.recent-food-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 9px;
+}
+
+.recent-food-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.home-screen .recent-food-card,
+.home-screen .recent-food-card:active {
+  width: 100%;
+  min-width: 0;
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #1a1a1a;
+  text-align: left;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.home-screen .recent-card-media {
+  width: 100%;
+  display: block;
+  overflow: hidden;
+  border: 0;
+  background: #f5f5f5;
+}
+
+.home-screen .recent-card-media.is-fallback {
+  height: 140px;
+  display: grid;
+  place-items: center;
+}
+
+.home-screen .recent-card-media.is-fallback .cat-fallback,
+.home-screen .recent-card-media.is-fallback .cat-fallback-image {
+  width: 52px;
+  height: 52px;
+  color: #5d6f62;
+}
+
+.home-screen .recent-card-media.has-photo {
+  height: auto;
+  line-height: 0;
+}
+
+.home-screen .recent-card-media.has-photo img.photo {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.home-screen .recent-card-body {
+  min-width: 0;
+  display: block;
+  padding: 9px;
+}
+
+.home-screen .recent-card-title {
+  width: 100%;
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0 0 6px;
+  color: #1a1a1a;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 20px;
+  white-space: normal;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.home-screen .recent-card-meta {
+  width: 100%;
+  display: block;
+  overflow: hidden;
+  margin: 0 0 9px;
+  color: #808080;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-screen .recent-card-type {
+  color: #0088df;
+}
+
+.home-screen .recent-card-divider {
+  color: #808080;
+}
+
+.recent-card-feedback-row {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.home-screen .recent-feedback-tag {
+  width: max-content;
+  height: 18px;
+  min-height: 18px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin: 0;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.home-screen .feedback-eager {
+  background: rgba(0, 183, 64, 0.09);
+  color: #00b740;
+}
+
+.home-screen .feedback-okay {
+  background: rgba(0, 155, 255, 0.09);
+  color: #009bff;
+}
+
+.home-screen .feedback-reluctant {
+  background: rgba(255, 181, 28, 0.09);
+  color: #ffb51c;
+}
+
+.home-screen .feedback-bury {
+  background: rgba(255, 49, 51, 0.09);
+  color: #ff3133;
+}
+
+.home-screen .feedback-unknown {
+  background: #f5f5f5;
+  color: #1a1a1a;
+}
+
+.home-screen .recent-card-time {
+  min-width: max-content;
+  color: #4d4d4d;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.home-feed-end {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 32px 0 8px;
+  color: #b3b3b3;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.home-feed-end span {
+  width: 48px;
+  height: 1px;
+  background: #b3b3b3;
+}
+
+.home-feed-end strong {
+  font: inherit;
+  white-space: nowrap;
+}
+
+.home-screen .recent-empty {
+  min-height: 140px;
+  border-radius: 6px;
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .home-screen .home-recent {
+    display: block;
   }
 }
