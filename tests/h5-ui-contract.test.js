@@ -240,13 +240,13 @@ test("底部导航使用统一线描图标、全局记录动作和独立安全�
   assert.doesNotMatch(source, /<svg/);
   assert.doesNotMatch(source, /function recordHub\(\)/);
   assert.doesNotMatch(source, /record: recordHub/);
-  assert.match(source, /data-record-trigger="nav"/);
+  assert.match(source, /data-nav="add"/);
   assert.match(source, /aria-label="添加记录"/);
   assert.match(source, /data-nav="\$\{key\}"/);
   assert.match(source, /data-open-picker/);
   assert.match(source, /function navStateIcon\(key, active\)/);
   assert.match(source, /nav-\$\{iconNames\[key\]\}-\$\{stateName\}\.svg/);
-  assert.match(source, /key === "record" && state\.pickerOpen/);
+  assert.match(source, /const destination = key === "record" \? "add" : key/);
   assert.match(styles, /--nav-content-height: 48px/);
   assert.match(styles, /--nav-active: #4571fc/);
   assert.match(
@@ -291,6 +291,45 @@ test("立即记录使用最近四款优先且可搜索展开的统一选择器",
   assert.match(styles, /\.record-picker-sheet\.expanded\s*\{[\s\S]*max-height: calc\(100dvh - 20px\)/);
   assert.match(styles, /\.picker-food-grid\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(styles, /\.record-type-chip\.active\s*\{[\s\S]*color: #16763a/);
+});
+
+test("添加记录直达新品页并为已有产品字段提供联想", () => {
+  assert.match(source, /<strong class="topbar-title">\$\{escapeHtml\(title\)\}<\/strong>/);
+  assert.match(source, /topbar\(editing \? "编辑食物" : "记一款新品"\)/);
+  assert.match(source, /function autocompleteSuggestions\(field, query\)/);
+  assert.match(source, /listFoods\(\)\.forEach\(\(food\) =>/);
+  assert.match(source, /AUTOCOMPLETE_PLACEHOLDERS/);
+  assert.match(source, /autocompleteField\("brand", "品牌"/);
+  assert.match(source, /autocompleteField\("name", "系列或名称"/);
+  assert.match(source, /autocompleteField\("flavor", "口味 \/ 肉源"/);
+  assert.match(source, /role="listbox"/);
+  assert.match(source, /data-autocomplete-option/);
+  assert.match(source, /data-autocomplete-value=/);
+  assert.match(source, /input\.focus\(\)/);
+  assert.match(styles, /\.autocomplete-menu\s*\{[\s\S]*position: absolute/);
+  assert.match(styles, /\.autocomplete-menu\[hidden\]\s*\{[\s\S]*display: none/);
+  assert.match(styles, /\.autocomplete-option\s*\{[\s\S]*min-height: 44px/);
+  assert.match(styles, /\.autocomplete-option:focus-visible/);
+});
+
+test("质地使用页面内选择器而不是原生下拉菜单", () => {
+  assert.match(
+    source,
+    /const TEXTURE_OPTIONS = \["肉泥 \/ 慕斯", "肉块", "肉丝", "冻干块", "其他"\];/
+  );
+  assert.match(source, /function textureField\(value\)/);
+  assert.match(source, /data-texture-trigger/);
+  assert.match(source, /data-texture-menu/);
+  assert.match(source, /data-texture-option=/);
+  assert.match(source, /function chooseTextureOption\(option\)/);
+  assert.match(source, /function bindTextureSelect\(\)/);
+  assert.match(source, /function positionTextureMenu\(\)/);
+  assert.doesNotMatch(source, /<select name="texture">/);
+  assert.match(styles, /\.custom-select-trigger\s*\{[\s\S]*min-height: 34px/);
+  assert.match(styles, /\.custom-select-menu\s*\{[\s\S]*border-radius: 14px/);
+  assert.match(styles, /\.custom-select-field\.opens-up \.custom-select-menu/);
+  assert.match(styles, /\.custom-select-menu\[hidden\]\s*\{[\s\S]*display: none/);
+  assert.match(styles, /\.custom-select-option\s*\{[\s\S]*min-height: 44px/);
 });
 
 test("移动端操作提供触控尺寸、粘性主操作和减少动态效果", () => {

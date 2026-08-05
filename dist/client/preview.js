@@ -24,6 +24,8 @@ const FOOD_TYPES = {
   other: "其他"
 };
 
+const TEXTURE_OPTIONS = ["肉泥 / 慕斯", "肉块", "肉丝", "冻干块", "其他"];
+
 const FOOD_TYPE_ORDER = [
   "staple_can",
   "snack_can",
@@ -237,6 +239,68 @@ function findFood(foodId) {
   return food ? rules.summarizeFood(food) : null;
 }
 
+const AUTOCOMPLETE_PLACEHOLDERS = new Set([
+  "品牌待补充",
+  "待补充品牌",
+  "未命名食物",
+  "待命名食物",
+  "口味待确认",
+  "肉类待补充"
+]);
+
+function autocompleteSuggestions(field, query) {
+  const normalizedQuery = String(query || "").trim().toLocaleLowerCase("zh-CN");
+  if (!normalizedQuery) return [];
+
+  const suggestions = new Map();
+
+  listFoods().forEach((food) => {
+    const value = String(food[field] || "").trim();
+    if (
+      !value ||
+      AUTOCOMPLETE_PLACEHOLDERS.has(value) ||
+      !value.toLocaleLowerCase("zh-CN").includes(normalizedQuery)
+    ) {
+      return;
+    }
+
+    const existing = suggestions.get(value) || { value, count: 0 };
+    existing.count += 1;
+    suggestions.set(value, existing);
+  });
+
+  return Array.from(suggestions.values()).slice(0, 6);
+}
+
+function autocompleteField(field, label, value, placeholder) {
+  const inputId = `food-${field}`;
+  const listId = `${inputId}-suggestions`;
+
+  return `
+    <div class="field field-autocomplete" data-autocomplete-field="${field}">
+      <label class="field-label-text" for="${inputId}">${label}</label>
+      <input
+        id="${inputId}"
+        name="${field}"
+        value="${escapeHtml(value || "")}"
+        placeholder="${escapeHtml(placeholder)}"
+        autocomplete="off"
+        aria-autocomplete="list"
+        aria-controls="${listId}"
+        aria-expanded="false"
+        data-autocomplete-input="${field}"
+      />
+      <div
+        id="${listId}"
+        class="autocomplete-menu"
+        data-autocomplete-list="${field}"
+        role="listbox"
+        hidden
+      ></div>
+    </div>
+  `;
+}
+
 function outcomeIcon(outcome) {
   return {
     eager: "heart",
@@ -435,18 +499,17 @@ function bottomNav(active) {
     <nav class="bottom-nav" aria-label="主导航">
       ${items
         .map(([key, label]) => {
-          const selected = active === key || (key === "record" && state.pickerOpen);
+          const destination = key === "record" ? "add" : key;
+          const selected = active === destination;
 
           if (key === "record") {
             return `
               <button
                 class="nav-item nav-item-record ${selected ? "active" : ""}"
                 type="button"
-                data-open-picker
-                data-record-trigger="nav"
-                aria-haspopup="dialog"
+                data-nav="add"
                 aria-label="添加记录"
-                aria-pressed="${selected}"
+                ${selected ? 'aria-current="page"' : ""}
               >
                 <span class="nav-icon-shell" aria-hidden="true">
                   ${navStateIcon(key, selected)}
@@ -694,6 +757,52 @@ function catProfileDialog() {
   `;
 }
 
+function textureField(value) {
+  const selected = TEXTURE_OPTIONS.includes(value) ? value : TEXTURE_OPTIONS[0];
+
+  return `
+    <div class="field custom-select-field" data-texture-select>
+      <span id="food-texture-label" class="field-label-text">质地</span>
+      <input type="hidden" name="texture" value="${escapeHtml(selected)}" data-texture-value />
+      <button
+        class="custom-select-trigger"
+        type="button"
+        data-texture-trigger
+        aria-labelledby="food-texture-label food-texture-value"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+      >
+        <span id="food-texture-value" class="custom-select-value">${escapeHtml(selected)}</span>
+        <span class="custom-select-chevron" aria-hidden="true"></span>
+      </button>
+      <div
+        class="custom-select-menu"
+        data-texture-menu
+        role="listbox"
+        aria-labelledby="food-texture-label"
+        hidden
+      >
+        ${TEXTURE_OPTIONS
+          .map(
+            (option) => `
+              <button
+                class="custom-select-option ${option === selected ? "selected" : ""}"
+                type="button"
+                role="option"
+                aria-selected="${option === selected}"
+                data-texture-option="${escapeHtml(option)}"
+              >
+                <span>${escapeHtml(option)}</span>
+                <span class="custom-select-option-mark" aria-hidden="true">${option === selected ? "✓" : ""}</span>
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
 function addFoodView() {
   const editing = state.selectedFoodId ? findFood(state.selectedFoodId) : null;
   const type = editing?.foodType || "staple_can";
@@ -705,7 +814,7 @@ function addFoodView() {
 
       <section class="page-intro">
         <h1>${editing ? "修改识别信息" : "先记住它是谁"}</h1>
-        <p>食物类型必选，包装、名称或品牌至少留一个。</p>
+        <p>食物类型必选，包装、名称或品牌至少留一个。输入品牌、名称或口味时会提示已有记录。</p>
       </section>
 
       <form id="food-form" data-editing-id="${editing?.id || ""}">
@@ -735,33 +844,14 @@ function addFoodView() {
         </fieldset>
 
         <section class="form-card">
-          <label class="field">
-            <span>品牌</span>
-            <input name="brand" value="${escapeHtml(editing?.brand || "")}" placeholder="例如 Catz Finefood" />
-          </label>
-          <label class="field">
-            <span>系列或名称</span>
-            <input name="name" value="${escapeHtml(editing?.name || "")}" placeholder="例如 鸡肉火鸡主食罐" />
-          </label>
+          ${autocompleteField("brand", "品牌", editing?.brand, "例如 Catz Finefood")}
+          ${autocompleteField("name", "系列或名称", editing?.name, "例如 鸡肉火鸡主食罐")}
           <label class="field">
             <span>规格</span>
             <input name="specification" value="${escapeHtml(editing?.specification || "")}" placeholder="例如 85g" />
           </label>
-          <label class="field">
-            <span>口味 / 肉源</span>
-            <input name="flavor" value="${escapeHtml(editing?.flavor || "")}" placeholder="例如 鸡肉、火鸡" />
-          </label>
-          <label class="field">
-            <span>质地</span>
-            <select name="texture">
-              ${["肉泥 / 慕斯", "肉块", "肉丝", "冻干块", "其他"]
-                .map(
-                  (value) =>
-                    `<option ${editing?.texture === value ? "selected" : ""}>${value}</option>`
-                )
-                .join("")}
-            </select>
-          </label>
+          ${autocompleteField("flavor", "口味 / 肉源", editing?.flavor, "例如 鸡肉、火鸡")}
+          ${textureField(editing?.texture)}
         </section>
 
         <p class="helper-text">包装识别将在下一阶段接入。现在照片会先作为你认出同款的凭证。</p>
@@ -1307,8 +1397,287 @@ function bindImageFallback(root = document) {
   });
 }
 
+function closeAutocompleteField(field) {
+  if (!field) return;
+
+  const input = field.querySelector("[data-autocomplete-input]");
+  const list = field.querySelector("[data-autocomplete-list]");
+  if (list) {
+    list.hidden = true;
+    list.innerHTML = "";
+  }
+  input?.setAttribute("aria-expanded", "false");
+  field.classList.remove("has-suggestions");
+}
+
+function closeAutocompleteMenus(except = null) {
+  document.querySelectorAll("[data-autocomplete-field]").forEach((field) => {
+    if (field !== except) closeAutocompleteField(field);
+  });
+}
+
+function refreshAutocomplete(field) {
+  const input = field?.querySelector("[data-autocomplete-input]");
+  const list = field?.querySelector("[data-autocomplete-list]");
+  if (!input || !list) return;
+
+  const suggestions = autocompleteSuggestions(field.dataset.autocompleteField, input.value);
+  if (!suggestions.length) {
+    closeAutocompleteField(field);
+    return;
+  }
+
+  list.innerHTML = `
+    <div class="autocomplete-heading">已有产品</div>
+    ${suggestions
+      .map(
+        ({ value, count }) => `
+          <button
+            class="autocomplete-option"
+            type="button"
+            role="option"
+            aria-selected="false"
+            data-autocomplete-option
+            data-autocomplete-value="${escapeHtml(value)}"
+          >
+            <span>${escapeHtml(value)}</span>
+            <small>${count} 款已有记录</small>
+          </button>
+        `
+      )
+      .join("")}
+  `;
+  list.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+  field.classList.add("has-suggestions");
+}
+
+function bindAutocomplete() {
+  if (app.dataset.autocompleteBound === "true") return;
+  app.dataset.autocompleteBound = "true";
+
+  app.addEventListener("input", (event) => {
+    const input = event.target.closest?.("[data-autocomplete-input]");
+    if (!input) return;
+
+    const field = input.closest("[data-autocomplete-field]");
+    closeAutocompleteMenus(field);
+    refreshAutocomplete(field);
+  });
+
+  app.addEventListener("focusin", (event) => {
+    const input = event.target.closest?.("[data-autocomplete-input]");
+    if (!input) return;
+    if (input.dataset.autocompleteSkipFocus === "true") {
+      delete input.dataset.autocompleteSkipFocus;
+      return;
+    }
+    if (!input.value.trim()) return;
+
+    const field = input.closest("[data-autocomplete-field]");
+    closeAutocompleteMenus(field);
+    refreshAutocomplete(field);
+  });
+
+  app.addEventListener("click", (event) => {
+    const option = event.target.closest?.("[data-autocomplete-option]");
+    if (option) {
+      event.preventDefault();
+      const field = option.closest("[data-autocomplete-field]");
+      const input = field?.querySelector("[data-autocomplete-input]");
+      if (field && input) {
+        input.value = option.dataset.autocompleteValue || "";
+        closeAutocompleteField(field);
+        input.dataset.autocompleteSkipFocus = "true";
+        input.focus();
+      }
+      return;
+    }
+
+    if (!event.target.closest?.("[data-autocomplete-field]")) {
+      closeAutocompleteMenus();
+    }
+  });
+
+  app.addEventListener("keydown", (event) => {
+    const control = event.target.closest?.(
+      "[data-autocomplete-input], [data-autocomplete-option]"
+    );
+    if (!control) return;
+
+    const field = control.closest("[data-autocomplete-field]");
+    const input = field?.querySelector("[data-autocomplete-input]");
+    const options = field
+      ? Array.from(field.querySelectorAll("[data-autocomplete-option]"))
+      : [];
+    const currentIndex = options.indexOf(control);
+
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeAutocompleteField(field);
+      input?.focus();
+      return;
+    }
+
+    if (event.key === "ArrowDown" && options.length) {
+      event.preventDefault();
+      options[(currentIndex + 1 + options.length) % options.length].focus();
+    }
+
+    if (event.key === "ArrowUp" && options.length) {
+      event.preventDefault();
+      if (currentIndex <= 0) {
+        input?.focus();
+      } else {
+        options[currentIndex - 1].focus();
+      }
+    }
+  });
+}
+
+function textureSelectParts() {
+  const field = document.querySelector("[data-texture-select]");
+  return {
+    field,
+    trigger: field?.querySelector("[data-texture-trigger]"),
+    menu: field?.querySelector("[data-texture-menu]"),
+    value: field?.querySelector("[data-texture-value]"),
+    label: field?.querySelector("#food-texture-value")
+  };
+}
+
+function closeTextureSelect(focusTrigger = false) {
+  const { field, trigger, menu } = textureSelectParts();
+  if (!field || !trigger || !menu) return;
+
+  field.classList.remove("is-open");
+  field.classList.remove("opens-up");
+  trigger.setAttribute("aria-expanded", "false");
+  menu.hidden = true;
+  if (focusTrigger) trigger.focus();
+}
+
+function positionTextureMenu() {
+  const { field, trigger, menu } = textureSelectParts();
+  if (!field || !trigger || !menu || !field.classList.contains("is-open")) return;
+
+  const triggerRect = trigger.getBoundingClientRect();
+  const menuHeight = menu.scrollHeight;
+  const spaceBelow = window.innerHeight - triggerRect.bottom;
+  const spaceAbove = triggerRect.top;
+  const opensUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
+  field.classList.toggle("opens-up", opensUp);
+}
+
+function openTextureSelect(focusSelected = false) {
+  const { field, trigger, menu } = textureSelectParts();
+  if (!field || !trigger || !menu) return;
+
+  field.classList.add("is-open");
+  trigger.setAttribute("aria-expanded", "true");
+  menu.hidden = false;
+  positionTextureMenu();
+
+  if (focusSelected) {
+    menu.querySelector('[data-texture-option][aria-selected="true"]')?.focus();
+  }
+}
+
+function chooseTextureOption(option) {
+  const { field, trigger, menu, value, label } = textureSelectParts();
+  const nextValue = option?.dataset.textureOption;
+  if (!field || !trigger || !menu || !value || !label || !nextValue) return;
+
+  value.value = nextValue;
+  label.textContent = nextValue;
+  menu.querySelectorAll("[data-texture-option]").forEach((item) => {
+    const selected = item === option;
+    item.classList.toggle("selected", selected);
+    item.setAttribute("aria-selected", String(selected));
+    const mark = item.querySelector(".custom-select-option-mark");
+    if (mark) mark.textContent = selected ? "✓" : "";
+  });
+  closeTextureSelect(true);
+}
+
+function bindTextureSelect() {
+  if (app.dataset.textureSelectBound === "true") return;
+  app.dataset.textureSelectBound = "true";
+
+  app.addEventListener("click", (event) => {
+    const trigger = event.target.closest?.("[data-texture-trigger]");
+    if (trigger) {
+      const { field } = textureSelectParts();
+      if (field?.classList.contains("is-open")) {
+        closeTextureSelect();
+      } else {
+        openTextureSelect();
+      }
+      return;
+    }
+
+    const option = event.target.closest?.("[data-texture-option]");
+    if (option) {
+      event.preventDefault();
+      chooseTextureOption(option);
+      return;
+    }
+
+    if (!event.target.closest?.("[data-texture-select]")) {
+      closeTextureSelect();
+    }
+  });
+
+  app.addEventListener("keydown", (event) => {
+    const trigger = event.target.closest?.("[data-texture-trigger]");
+    if (trigger) {
+      if (["ArrowDown", "Enter", " "].includes(event.key)) {
+        event.preventDefault();
+        openTextureSelect(true);
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        closeTextureSelect();
+      }
+      return;
+    }
+
+    const option = event.target.closest?.("[data-texture-option]");
+    if (!option) return;
+
+    const menu = option.closest("[data-texture-menu]");
+    const options = menu
+      ? Array.from(menu.querySelectorAll("[data-texture-option]"))
+      : [];
+    const currentIndex = options.indexOf(option);
+
+    if (event.key === "ArrowDown" && options.length) {
+      event.preventDefault();
+      options[(currentIndex + 1) % options.length].focus();
+    } else if (event.key === "ArrowUp" && options.length) {
+      event.preventDefault();
+      options[(currentIndex - 1 + options.length) % options.length].focus();
+    } else if (event.key === "Home" && options.length) {
+      event.preventDefault();
+      options[0].focus();
+    } else if (event.key === "End" && options.length) {
+      event.preventDefault();
+      options[options.length - 1].focus();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeTextureSelect(true);
+    } else if (["Enter", " "].includes(event.key)) {
+      event.preventDefault();
+      chooseTextureOption(option);
+    }
+  });
+
+  window.addEventListener("resize", positionTextureMenu);
+}
+
 function bindEvents() {
   bindImageFallback();
+  bindAutocomplete();
+  bindTextureSelect();
 
   document.querySelectorAll("[data-nav]").forEach((element) => {
     element.addEventListener("click", () => {
