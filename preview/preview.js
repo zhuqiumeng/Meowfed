@@ -1,18 +1,18 @@
 const ICONS = {
-  home: "/assets/icons/ddmc-home.svg",
-  add: "/assets/icons/ddmc-add.svg",
-  camera: "/assets/icons/ddmc-camera.svg",
-  list: "/assets/icons/ddmc-list.svg",
-  box: "/assets/icons/ddmc-box.svg",
-  can: "/assets/icons/phosphor-cylinder-light.svg",
-  cat: "/assets/icons/phosphor-cat-thin.svg",
-  eye: "/assets/icons/ddmc-eye.svg",
-  heart: "/assets/icons/ddmc-heart.svg",
-  check: "/assets/icons/ddmc-check.svg",
-  warning: "/assets/icons/ddmc-warning.svg",
-  clock: "/assets/icons/ddmc-clock.svg",
-  back: "/assets/icons/ddmc-back.svg",
-  search: "/assets/icons/ddmc-search.svg"
+  home: "./assets/icons/ddmc-home.svg",
+  add: "./assets/icons/ddmc-add.svg",
+  camera: "./assets/icons/ddmc-camera.svg",
+  list: "./assets/icons/ddmc-list.svg",
+  box: "./assets/icons/ddmc-box.svg",
+  can: "./assets/icons/phosphor-cylinder-light.svg",
+  cat: "./assets/icons/phosphor-cat-thin.svg",
+  eye: "./assets/icons/ddmc-eye.svg",
+  heart: "./assets/icons/ddmc-heart.svg",
+  check: "./assets/icons/ddmc-check.svg",
+  warning: "./assets/icons/ddmc-warning.svg",
+  clock: "./assets/icons/ddmc-clock.svg",
+  back: "./assets/icons/ddmc-back.svg",
+  search: "./assets/icons/ddmc-search.svg"
 };
 
 const FOOD_TYPES = {
@@ -35,7 +35,7 @@ const FOOD_TYPE_ORDER = [
   "other"
 ];
 
-const DEFAULT_CAT_AVATAR = "/assets/cat-profile-default.jpg";
+const DEFAULT_CAT_AVATAR = "./assets/cat-profile-default.jpg";
 const RULE_DAY_MS = window.CatEatRules.DAY_MS;
 const now = Date.now();
 
@@ -634,7 +634,7 @@ function navStateIcon(key, active) {
   };
   const stateName = active ? "active" : "default";
 
-  return `<img class="nav-state-icon" src="/assets/icons/nav-${iconNames[key]}-${stateName}.svg" alt="" />`;
+  return `<img class="nav-state-icon" src="./assets/icons/nav-${iconNames[key]}-${stateName}.svg" alt="" />`;
 }
 
 function bottomNav(active) {
