@@ -16,7 +16,7 @@
   const DB_NAME = "cat-eat-local";
   const DB_VERSION = 1;
   const SCHEMA_VERSION = 1;
-  const DEFAULT_CAT_AVATAR = "/assets/cat-profile-default.jpg";
+  const DEFAULT_CAT_AVATAR = "./assets/cat-profile-default.jpg";
   const LEGACY_KEYS = {
     foods: "CAT_EAT_H5_FOODS_V2",
     initialized: "CAT_EAT_H5_INITIALIZED_V2",

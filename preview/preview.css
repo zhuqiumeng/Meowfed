@@ -2385,73 +2385,73 @@ button:active {
 }
 
 .icon-home {
-  -webkit-mask-image: url("/assets/icons/ddmc-home.svg");
-  mask-image: url("/assets/icons/ddmc-home.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-home.svg");
+  mask-image: url("./assets/icons/ddmc-home.svg");
 }
 
 .icon-add {
-  -webkit-mask-image: url("/assets/icons/ddmc-add.svg");
-  mask-image: url("/assets/icons/ddmc-add.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-add.svg");
+  mask-image: url("./assets/icons/ddmc-add.svg");
 }
 
 .icon-camera {
-  -webkit-mask-image: url("/assets/icons/ddmc-camera.svg");
-  mask-image: url("/assets/icons/ddmc-camera.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-camera.svg");
+  mask-image: url("./assets/icons/ddmc-camera.svg");
 }
 
 .icon-list {
-  -webkit-mask-image: url("/assets/icons/ddmc-list.svg");
-  mask-image: url("/assets/icons/ddmc-list.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-list.svg");
+  mask-image: url("./assets/icons/ddmc-list.svg");
 }
 
 .icon-box {
-  -webkit-mask-image: url("/assets/icons/ddmc-box.svg");
-  mask-image: url("/assets/icons/ddmc-box.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-box.svg");
+  mask-image: url("./assets/icons/ddmc-box.svg");
 }
 
 .icon-can {
-  -webkit-mask-image: url("/assets/icons/phosphor-cylinder-light.svg");
-  mask-image: url("/assets/icons/phosphor-cylinder-light.svg");
+  -webkit-mask-image: url("./assets/icons/phosphor-cylinder-light.svg");
+  mask-image: url("./assets/icons/phosphor-cylinder-light.svg");
 }
 
 .icon-cat {
-  -webkit-mask-image: url("/assets/icons/phosphor-cat-thin.svg");
-  mask-image: url("/assets/icons/phosphor-cat-thin.svg");
+  -webkit-mask-image: url("./assets/icons/phosphor-cat-thin.svg");
+  mask-image: url("./assets/icons/phosphor-cat-thin.svg");
 }
 
 .icon-eye {
-  -webkit-mask-image: url("/assets/icons/ddmc-eye.svg");
-  mask-image: url("/assets/icons/ddmc-eye.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-eye.svg");
+  mask-image: url("./assets/icons/ddmc-eye.svg");
 }
 
 .icon-heart {
-  -webkit-mask-image: url("/assets/icons/ddmc-heart.svg");
-  mask-image: url("/assets/icons/ddmc-heart.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-heart.svg");
+  mask-image: url("./assets/icons/ddmc-heart.svg");
 }
 
 .icon-check {
-  -webkit-mask-image: url("/assets/icons/ddmc-check.svg");
-  mask-image: url("/assets/icons/ddmc-check.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-check.svg");
+  mask-image: url("./assets/icons/ddmc-check.svg");
 }
 
 .icon-warning {
-  -webkit-mask-image: url("/assets/icons/ddmc-warning.svg");
-  mask-image: url("/assets/icons/ddmc-warning.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-warning.svg");
+  mask-image: url("./assets/icons/ddmc-warning.svg");
 }
 
 .icon-clock {
-  -webkit-mask-image: url("/assets/icons/ddmc-clock.svg");
-  mask-image: url("/assets/icons/ddmc-clock.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-clock.svg");
+  mask-image: url("./assets/icons/ddmc-clock.svg");
 }
 
 .icon-back {
-  -webkit-mask-image: url("/assets/icons/ddmc-back.svg");
-  mask-image: url("/assets/icons/ddmc-back.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-back.svg");
+  mask-image: url("./assets/icons/ddmc-back.svg");
 }
 
 .icon-search {
-  -webkit-mask-image: url("/assets/icons/ddmc-search.svg");
-  mask-image: url("/assets/icons/ddmc-search.svg");
+  -webkit-mask-image: url("./assets/icons/ddmc-search.svg");
+  mask-image: url("./assets/icons/ddmc-search.svg");
 }
 
 .topbar {
