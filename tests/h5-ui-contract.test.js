@@ -11,6 +11,10 @@ const styles = readFileSync(
   join(__dirname, "..", "preview", "preview.css"),
   "utf8"
 );
+const dataStoreSource = readFileSync(
+  join(__dirname, "..", "utils", "data-store.js"),
+  "utf8"
+);
 const previewServer = readFileSync(
   join(__dirname, "..", "tools", "serve-preview.js"),
   "utf8"
@@ -152,7 +156,7 @@ test("补货清单使用状态 Tab 和按需出现的线框类型胶囊", () => 
 });
 
 test("补货清单顶部展示单猫头像和可编辑昵称，商品使用类型包装图标", () => {
-  assert.match(source, /CAT_EAT_H5_CAT_PROFILE_V1/);
+  assert.match(dataStoreSource, /CAT_EAT_H5_CAT_PROFILE_V1/);
   assert.match(source, /DEFAULT_CAT_AVATAR = "\/assets\/cat-profile-default\.jpg"/);
   assert.match(source, /class="library-cat-profile"/);
   assert.match(source, /class="library-profile-center"/);
@@ -178,6 +182,20 @@ test("补货清单顶部展示单猫头像和可编辑昵称，商品使用类�
   assert.match(styles, /\.product-thumb-staple_can,[\s\S]*\.product-thumb-snack_can/);
   assert.match(styles, /\.icon-can\s*\{[\s\S]*phosphor-cylinder-light\.svg/);
   assert.match(styles, /\.food-row\s*\{[\s\S]*min-width: 0;[\s\S]*max-width: 100%/);
+});
+
+test("H5 UI 仅通过统一数据访问层读写持久数据", () => {
+  assert.match(source, /const dataStore = window\.CatEatData/);
+  assert.match(source, /await dataStore\.initialize/);
+  assert.match(source, /return dataStore\.getFoods\(\)/);
+  assert.match(source, /return dataStore\.getCatProfile\(\)/);
+  assert.doesNotMatch(source, /localStorage/);
+  assert.doesNotMatch(source, /indexedDB/);
+  assert.match(dataStoreSource, /const DB_NAME = "cat-eat-local"/);
+  assert.match(dataStoreSource, /db\.createObjectStore\("foods"/);
+  assert.match(dataStoreSource, /db\.createObjectStore\("results"/);
+  assert.match(dataStoreSource, /db\.createObjectStore\("assets"/);
+  assert.match(dataStoreSource, /migration\.localStorageV2/);
 });
 
 test("全局使用 FAFAFA 画布和克制的彩色弥散背景", () => {
