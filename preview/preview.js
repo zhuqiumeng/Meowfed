@@ -272,6 +272,211 @@ function autocompleteSuggestions(field, query) {
   return Array.from(suggestions.values()).slice(0, 6);
 }
 
+function normalizeProductText(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("zh-CN")
+    .replace(/[·•/／、,，;；:：\-—_()[\]{}]/g, "")
+    .replace(/\s+/g, "");
+}
+
+function productTextVariants(value) {
+  const normalized = normalizeProductText(value);
+  if (!normalized) return [];
+
+  const variants = new Set([normalized]);
+  const replacements = [
+    ["火鸡肉", "火鸡"],
+    ["鸡肉", "鸡"],
+    ["牛肉", "牛"],
+    ["鸭肉", "鸭"],
+    ["羊肉", "羊"],
+    ["主食罐头", "罐"],
+    ["主食罐", "罐"],
+    ["零食罐头", "罐"],
+    ["零食罐", "罐"],
+    ["罐头", "罐"]
+  ];
+
+  replacements.forEach(([from, to]) => {
+    Array.from(variants).forEach((variant) => {
+      const replaced = variant.replaceAll(from, to);
+      if (replaced) variants.add(replaced);
+    });
+  });
+
+  return Array.from(variants);
+}
+
+function productFieldMatches(value, existingValue, field) {
+  const leftVariants = productTextVariants(value);
+  const rightVariants = productTextVariants(existingValue);
+  if (!leftVariants.length || !rightVariants.length) return false;
+
+  if (leftVariants.some((variant) => rightVariants.includes(variant))) {
+    return true;
+  }
+
+  if (!['brand', 'name'].includes(field)) return false;
+
+  return leftVariants.some((left) =>
+    rightVariants.some((right) => {
+      const shorter = left.length <= right.length ? left : right;
+      const longer = left.length <= right.length ? right : left;
+      const minimumLength = field === 'brand' ? 3 : 4;
+      return shorter.length >= minimumLength && longer.includes(shorter);
+    })
+  );
+}
+
+function specificationMatches(value, existingValue) {
+  const normalize = (candidate) =>
+    normalizeProductText(candidate)
+      .replaceAll("毫升", "ml")
+      .replaceAll("厘米", "cm")
+      .replaceAll("克", "g");
+  return productFieldMatches(normalize(value), normalize(existingValue), "specification");
+}
+
+function duplicateFormValues(form) {
+  const data = new FormData(form);
+  return {
+    brand: String(data.get("brand") || "").trim(),
+    name: String(data.get("name") || "").trim(),
+    specification: String(data.get("specification") || "").trim(),
+    flavor: String(data.get("flavor") || "").trim(),
+    foodType: String(data.get("foodType") || "").trim()
+  };
+}
+
+function isUsableProductValue(value) {
+  const text = String(value || "").trim();
+  return Boolean(text && !AUTOCOMPLETE_PLACEHOLDERS.has(text));
+}
+
+function scoreDuplicateFood(values, food) {
+  if (!food || values.foodType && food.foodType && values.foodType !== food.foodType) {
+    return null;
+  }
+
+  const fields = {
+    brand: productFieldMatches(values.brand, food.brand, "brand"),
+    name: productFieldMatches(values.name, food.name, "name"),
+    specification: specificationMatches(values.specification, food.specification),
+    flavor: productFieldMatches(values.flavor, food.flavor, "flavor")
+  };
+
+  const providedFields = Object.keys(fields).filter((field) => isUsableProductValue(values[field]));
+  if (providedFields.length < 2) return null;
+
+  const conflictingField = providedFields.find(
+    (field) => isUsableProductValue(food[field]) && !fields[field]
+  );
+  if (conflictingField) return null;
+
+  const hasBrandAndName = fields.brand && fields.name;
+  const hasBrandAndFlavorAndSize = fields.brand && fields.flavor && fields.specification;
+  const hasNameAndFlavorAndSize = fields.name && fields.flavor && fields.specification;
+  if (!hasBrandAndName && !hasBrandAndFlavorAndSize && !hasNameAndFlavorAndSize) {
+    return null;
+  }
+
+  const weights = { brand: 5, name: 6, specification: 4, flavor: 3 };
+  const score = providedFields.reduce(
+    (total, field) => total + (fields[field] ? weights[field] : 0),
+    0
+  );
+  const confidence = hasBrandAndName && score >= 11 ? "direct" : "possible";
+
+  return {
+    food,
+    fields,
+    matchedFields: providedFields.filter((field) => fields[field]),
+    score: score + (hasBrandAndName ? 4 : 0) + (fields.specification ? 2 : 0),
+    confidence
+  };
+}
+
+function findLikelyDuplicateFood(values, excludeId = "") {
+  return listFoods()
+    .filter((food) => food.id !== excludeId)
+    .map((food) => scoreDuplicateFood(values, food))
+    .filter(Boolean)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aTime = a.food.latestResult?.createdAt || a.food.createdAt;
+      const bTime = b.food.latestResult?.createdAt || b.food.createdAt;
+      return bTime - aTime;
+    })[0] || null;
+}
+
+function duplicateFoodNotice(match) {
+  if (!match) return "";
+
+  const food = match.food;
+  const title = [food.brand, food.name, food.specification].filter(Boolean).join(" · ");
+  const detail = [
+    FOOD_TYPES[food.foodType] || "其他",
+    food.flavor,
+    food.latestOutcome ? `最近：${food.latestOutcome.shortLabel}` : "还没反馈"
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return `
+    <span class="duplicate-food-icon-shell">${uiIcon("search", "duplicate-food-icon")}</span>
+    <span class="duplicate-food-copy">
+      <strong>${match.confidence === "direct" ? "这款食物已经有记录" : "这款食物可能记录过"}</strong>
+      <span class="duplicate-food-title">已有：${escapeHtml(title || food.name || "未命名食物")}</span>
+      <small>${escapeHtml(detail)}</small>
+      <small>如果是不同包装或配方，仍可以继续添加。</small>
+    </span>
+    <button
+      class="duplicate-food-action"
+      type="button"
+      data-duplicate-food="${escapeHtml(food.id)}"
+    >查看已有记录</button>
+  `;
+}
+
+function refreshDuplicateFoodNotice(form = document.querySelector("#food-form")) {
+  const notice = form?.querySelector("[data-duplicate-food-notice]");
+  if (!form || !notice) return;
+
+  const match = findLikelyDuplicateFood(
+    duplicateFormValues(form),
+    form.dataset.editingId || ""
+  );
+
+  notice.innerHTML = duplicateFoodNotice(match);
+  notice.hidden = !match;
+}
+
+function bindDuplicateFoodCheck() {
+  if (app.dataset.duplicateFoodCheckBound === "true") return;
+  app.dataset.duplicateFoodCheckBound = "true";
+
+  const refresh = (event) => {
+    const form = event?.target?.closest?.("#food-form") || document.querySelector("#food-form");
+    if (form) refreshDuplicateFoodNotice(form);
+  };
+
+  app.addEventListener("input", (event) => {
+    if (event.target.closest?.("#food-form")) refresh(event);
+  });
+
+  app.addEventListener("change", (event) => {
+    if (event.target.closest?.("#food-form")) refresh(event);
+  });
+
+  app.addEventListener("click", (event) => {
+    const button = event.target.closest?.("[data-duplicate-food]");
+    if (!button) return;
+    event.preventDefault();
+    route("detail", { id: button.dataset.duplicateFood });
+  });
+}
+
 function autocompleteField(field, label, value, placeholder) {
   const inputId = `food-${field}`;
   const listId = `${inputId}-suggestions`;
@@ -853,6 +1058,8 @@ function addFoodView() {
           ${autocompleteField("flavor", "口味 / 肉源", editing?.flavor, "例如 鸡肉、火鸡")}
           ${textureField(editing?.texture)}
         </section>
+
+        <section class="duplicate-food-notice" data-duplicate-food-notice role="status" aria-live="polite" hidden></section>
 
         <p class="helper-text">包装识别将在下一阶段接入。现在照片会先作为你认出同款的凭证。</p>
         <button class="primary-button sticky-action" type="submit">${editing ? "保存修改" : "加入试吃清单"}</button>
@@ -1490,6 +1697,7 @@ function bindAutocomplete() {
         closeAutocompleteField(field);
         input.dataset.autocompleteSkipFocus = "true";
         input.focus();
+        refreshDuplicateFoodNotice(input.closest("#food-form"));
       }
       return;
     }
@@ -1677,7 +1885,9 @@ function bindTextureSelect() {
 function bindEvents() {
   bindImageFallback();
   bindAutocomplete();
+  bindDuplicateFoodCheck();
   bindTextureSelect();
+  refreshDuplicateFoodNotice();
 
   document.querySelectorAll("[data-nav]").forEach((element) => {
     element.addEventListener("click", () => {

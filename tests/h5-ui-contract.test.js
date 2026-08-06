@@ -312,6 +312,22 @@ test("添加记录直达新品页并为已有产品字段提供联想", () => {
   assert.match(styles, /\.autocomplete-option:focus-visible/);
 });
 
+test("添加页会用本地数据提示可能重复的产品", () => {
+  assert.match(source, /function normalizeProductText\(value\)/);
+  assert.match(source, /function productTextVariants\(value\)/);
+  assert.match(source, /function findLikelyDuplicateFood\(values, excludeId = ""\)/);
+  assert.match(
+    source,
+    /function refreshDuplicateFoodNotice\(form = document\.querySelector\("#food-form"\)\)/
+  );
+  assert.match(source, /data-duplicate-food-notice/);
+  assert.match(source, /这款食物已经有记录/);
+  assert.match(source, /查看已有记录/);
+  assert.match(source, /route\("detail", \{ id: button\.dataset\.duplicateFood \}\)/);
+  assert.match(styles, /\.duplicate-food-notice\s*\{[\s\S]*grid-template-columns/);
+  assert.match(styles, /\.duplicate-food-notice\[hidden\]\s*\{[\s\S]*display: none/);
+});
+
 test("质地使用页面内选择器而不是原生下拉菜单", () => {
   assert.match(
     source,
