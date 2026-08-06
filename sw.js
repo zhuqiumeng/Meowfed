@@ -1,9 +1,10 @@
-const CACHE_NAME = "cat-eat-h5-v9";
+const CACHE_NAME = "cat-eat-h5-v10";
 const APP_ASSETS = [
   "/?screen=home",
-  "/preview.css?v=9",
-  "/preview.js?v=9",
+  "/preview.css?v=10",
+  "/preview.js?v=10",
   "/utils/rules.js",
+  "/utils/data-store.js",
   "/manifest.webmanifest",
   "/assets/cat-profile-default.jpg",
   "/assets/icons/phosphor-cat-thin.svg",

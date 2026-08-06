@@ -35,10 +35,6 @@ const FOOD_TYPE_ORDER = [
   "other"
 ];
 
-const STORAGE_KEY = "CAT_EAT_H5_FOODS_V2";
-const INITIALIZED_KEY = "CAT_EAT_H5_INITIALIZED_V2";
-const PARTICIPANT_KEY = "CAT_EAT_H5_PARTICIPANT_V1";
-const CAT_PROFILE_KEY = "CAT_EAT_H5_CAT_PROFILE_V1";
 const DEFAULT_CAT_AVATAR = "/assets/cat-profile-default.jpg";
 const RULE_DAY_MS = window.CatEatRules.DAY_MS;
 const now = Date.now();
@@ -121,6 +117,7 @@ const DEMO_FOODS = [
 const app = document.querySelector("#app");
 const toast = document.querySelector("#toast");
 const rules = window.CatEatRules;
+const dataStore = window.CatEatData;
 
 const state = {
   screen: new URLSearchParams(location.search).get("screen") || "home",
@@ -151,77 +148,24 @@ function escapeHtml(value = "") {
     .replaceAll("'", "&#039;");
 }
 
-function createId(prefix) {
-  if (window.crypto && typeof window.crypto.randomUUID === "function") {
-    return `${prefix}-${window.crypto.randomUUID()}`;
-  }
-
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function ensureParticipant() {
-  const invite = new URLSearchParams(location.search).get("invite");
-  const existing = localStorage.getItem(PARTICIPANT_KEY);
-
-  if (invite) {
-    localStorage.setItem(PARTICIPANT_KEY, `invite:${invite}`);
-    return `invite:${invite}`;
-  }
-
-  if (existing) {
-    return existing;
-  }
-
-  const localId = createId("local");
-  localStorage.setItem(PARTICIPANT_KEY, localId);
-  return localId;
+function createId() {
+  return dataStore.createUuid();
 }
 
 function readFoods() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  } catch (error) {
-    return [];
-  }
-}
-
-function writeFoods(foods) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(foods));
-    return true;
-  } catch (error) {
-    showToast("照片或数据太多，暂时没有保存成功");
-    return false;
-  }
+  return dataStore.getFoods();
 }
 
 function readCatProfile() {
-  try {
-    const profile = JSON.parse(localStorage.getItem(CAT_PROFILE_KEY) || "{}");
-    const ageYears = Number(profile.ageYears);
-    return {
-      nickname: typeof profile.nickname === "string" ? profile.nickname.trim() : "",
-      ageYears: Number.isFinite(ageYears) && ageYears > 0 ? ageYears : null,
-      photoPath: typeof profile.photoPath === "string" ? profile.photoPath : ""
-    };
-  } catch (error) {
-    return { nickname: "", ageYears: null, photoPath: "" };
-  }
+  return dataStore.getCatProfile();
 }
 
-function writeCatProfile(profile) {
-  localStorage.setItem(CAT_PROFILE_KEY, JSON.stringify(profile));
+function writeCatProfile(profile, options = {}) {
+  return dataStore.saveCatProfile(profile, options);
 }
 
 function formatCatNickname(nickname) {
   return nickname || "噜噜";
-}
-
-function ensureInitialized() {
-  if (!localStorage.getItem(INITIALIZED_KEY)) {
-    writeFoods([]);
-    localStorage.setItem(INITIALIZED_KEY, "1");
-  }
 }
 
 function listFoods() {
@@ -1454,7 +1398,7 @@ function compressImage(file) {
   });
 }
 
-function submitFood(form) {
+async function submitFood(form) {
   const data = new FormData(form);
   const editingId = form.dataset.editingId;
   const foods = readFoods();
@@ -1472,81 +1416,80 @@ function submitFood(form) {
   const food = {
     ...(existing || {}),
     id: existing?.id || createId("food"),
+    catId: existing?.catId || dataStore.status().catId,
+    ownerId: existing?.ownerId || null,
     brand: brand || "品牌待补充",
     name: name || "未命名食物",
     specification: String(data.get("specification") || "").trim(),
     foodType: String(data.get("foodType") || "other"),
     flavor: String(data.get("flavor") || "").trim(),
     texture: String(data.get("texture") || "其他"),
-    photoPath,
     createdAt: existing?.createdAt || Date.now(),
-    results: existing?.results || []
+    updatedAt: Date.now()
   };
 
-  if (existingIndex >= 0) {
-    foods[existingIndex] = food;
-  } else {
-    foods.unshift(food);
-  }
-
-  if (writeFoods(foods)) {
+  try {
+    await dataStore.saveFood(food, { photoDataUrl: state.photoDataUrl });
     state.photoDataUrl = "";
     route("detail", { id: food.id });
     showToast(existing ? "修改已经保存" : "已经加入试吃清单");
+  } catch (error) {
+    showToast("照片或数据暂时没有保存成功");
   }
 }
 
-function submitFeedback() {
+async function submitFeedback() {
   if (!state.selectedOutcome) {
     return;
   }
 
-  const foods = readFoods();
-  const index = foods.findIndex((food) => food.id === state.selectedFoodId);
-  if (index < 0) {
+  const food = dataStore.getFood(state.selectedFoodId);
+  if (!food) {
     showToast("没有找到这款食物");
     return;
   }
 
-  foods[index].manualStatus = null;
-  foods[index].results = foods[index].results || [];
-  foods[index].results.push({
-    id: createId("result"),
-    outcome: state.selectedOutcome,
-    createdAt: Date.now()
-  });
-
-  const summary = rules.summarizeFood(foods[index]);
-  if (summary.status.key === "repurchase") {
-    foods[index].everQualified = true;
-  }
-
-  if (writeFoods(foods)) {
-    const foodId = foods[index].id;
+  try {
+    let updated = await dataStore.addResult(food.id, {
+      id: createId("result"),
+      outcome: state.selectedOutcome,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+    const summary = rules.summarizeFood(updated);
+    if (summary.status.key === "repurchase" && !updated.everQualified) {
+      updated = await dataStore.updateFood(food.id, { everQualified: true });
+    }
     state.selectedOutcome = "";
-    route("detail", { id: foodId });
+    route("detail", { id: updated.id });
     showToast("这次表现已经记住");
+  } catch (error) {
+    showToast("这次反馈暂时没有保存成功");
   }
 }
 
-function retryFood(foodId) {
-  const foods = readFoods();
-  const index = foods.findIndex((food) => food.id === foodId);
-  if (index < 0) return;
-  foods[index].manualRetryAfter = Date.now();
-  writeFoods(foods);
-  render();
-  showToast("已回到试吃中，原来的记录仍然保留");
+async function retryFood(foodId) {
+  try {
+    await dataStore.updateFood(foodId, { manualRetryAfter: Date.now() });
+    render();
+    showToast("已回到试吃中，原来的记录仍然保留");
+  } catch (error) {
+    showToast("暂时没有保存成功");
+  }
 }
 
-function deleteFood(foodId) {
+async function deleteFood(foodId) {
   if (!window.confirm("删除后会同时移除全部反馈，确定删除吗？")) {
     return;
   }
 
-  writeFoods(readFoods().filter((food) => food.id !== foodId));
-  route("home");
-  showToast("这款食物已删除");
+  try {
+    await dataStore.deleteFood(foodId);
+    route("home");
+    showToast("这款食物已删除");
+  } catch (error) {
+    showToast("暂时没有删除成功");
+  }
 }
 
 function bindFoodLinks(root = document) {
@@ -2011,7 +1954,7 @@ function bindEvents() {
     });
   });
 
-  document.querySelector("#cat-profile-form")?.addEventListener("submit", (event) => {
+  document.querySelector("#cat-profile-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const nickname = String(
       new FormData(event.currentTarget).get("nickname") || ""
@@ -2020,17 +1963,25 @@ function bindEvents() {
       showToast("请填写猫猫昵称");
       return;
     }
-    writeCatProfile({ ...readCatProfile(), nickname });
-    state.profileOpen = false;
-    render();
-    showToast("猫猫昵称已保存");
+    try {
+      await writeCatProfile({ ...readCatProfile(), nickname });
+      state.profileOpen = false;
+      render();
+      showToast("猫猫昵称已保存");
+    } catch (error) {
+      showToast("昵称暂时没有保存成功");
+    }
   });
 
-  document.querySelector("[data-load-demo]")?.addEventListener("click", () => {
-    writeFoods(clone(DEMO_FOODS));
-    render();
-    window.scrollTo(0, 0);
-    showToast("示例已经准备好");
+  document.querySelector("[data-load-demo]")?.addEventListener("click", async () => {
+    try {
+      await dataStore.replaceFoods(clone(DEMO_FOODS));
+      render();
+      window.scrollTo(0, 0);
+      showToast("示例已经准备好");
+    } catch (error) {
+      showToast("示例暂时没有载入成功");
+    }
   });
 
   bindFoodLinks();
@@ -2087,7 +2038,7 @@ function bindEvents() {
 
     try {
       const photoPath = await compressImage(file);
-      writeCatProfile({ ...readCatProfile(), photoPath });
+      await writeCatProfile(readCatProfile(), { photoDataUrl: photoPath });
       render();
       showToast("猫猫头像已更新");
     } catch (error) {
@@ -2095,9 +2046,9 @@ function bindEvents() {
     }
   });
 
-  document.querySelector("#food-form")?.addEventListener("submit", (event) => {
+  document.querySelector("#food-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    submitFood(event.currentTarget);
+    await submitFood(event.currentTarget);
   });
 
   const librarySearch = document.querySelector("[data-library-search]");
@@ -2166,13 +2117,25 @@ window.addEventListener("popstate", () => {
   render();
 });
 
-ensureParticipant();
-ensureInitialized();
-if (new URLSearchParams(location.search).get("screen") === "record") {
-  state.screen = "home";
-  history.replaceState(null, "", "?screen=home");
+async function bootstrap() {
+  const params = new URLSearchParams(location.search);
+  const invite = params.get("invite");
+  const storageStatus = await dataStore.initialize({
+    participantId: invite ? `invite:${invite}` : ""
+  });
+
+  if (params.get("screen") === "record") {
+    state.screen = "home";
+    history.replaceState(null, "", "?screen=home");
+  }
+  render();
+
+  if (storageStatus.mode === "legacy-fallback") {
+    showToast("本地数据库暂时不可用，原数据仍已保留");
+  }
 }
-render();
+
+bootstrap();
 
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   window.addEventListener("load", () => {
