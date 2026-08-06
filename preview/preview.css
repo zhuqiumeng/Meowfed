@@ -4401,6 +4401,100 @@ button:active {
   border-radius: 4px;
 }
 
+.duplicate-food-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  margin: 12px 2px 0;
+  padding: 12px;
+  border: 1px solid rgba(0, 122, 255, 0.2);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(237, 247, 255, 0.94), rgba(245, 251, 255, 0.82));
+  color: #1d2939;
+}
+
+.duplicate-food-notice[hidden] {
+  display: none;
+}
+
+.duplicate-food-icon-shell {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--system-blue);
+}
+
+.duplicate-food-icon {
+  width: 17px;
+  height: 17px;
+}
+
+.duplicate-food-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+.duplicate-food-copy strong {
+  color: #174b80;
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.duplicate-food-copy small,
+.duplicate-food-title {
+  min-width: 0;
+  overflow: hidden;
+  color: #667085;
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duplicate-food-title {
+  color: #344054;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.duplicate-food-action {
+  min-height: 34px;
+  align-self: center;
+  padding: 0 9px;
+  border: 1px solid rgba(0, 122, 255, 0.2);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--system-blue);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.duplicate-food-action:hover,
+.duplicate-food-action:focus-visible {
+  outline: 0;
+  border-color: rgba(0, 122, 255, 0.42);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+@media (max-width: 390px) {
+  .duplicate-food-notice {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .duplicate-food-action {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .autocomplete-menu {
     scroll-behavior: auto;
