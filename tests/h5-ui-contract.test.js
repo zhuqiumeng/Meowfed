@@ -157,7 +157,7 @@ test("补货清单使用状态 Tab 和按需出现的线框类型胶囊", () => 
 
 test("补货清单顶部展示单猫头像和可编辑昵称，商品使用类型包装图标", () => {
   assert.match(dataStoreSource, /CAT_EAT_H5_CAT_PROFILE_V1/);
-  assert.match(source, /DEFAULT_CAT_AVATAR = "\/assets\/cat-profile-default\.jpg"/);
+  assert.match(source, /DEFAULT_CAT_AVATAR = "\.\/assets\/cat-profile-default\.jpg"/);
   assert.match(source, /class="library-cat-profile"/);
   assert.match(source, /class="library-profile-center"/);
   assert.match(source, /class="library-cat-avatar"/);
@@ -318,7 +318,7 @@ test("添加记录直达新品页并为已有产品字段提供联想", () => {
   assert.match(source, /listFoods\(\)\.forEach\(\(food\) =>/);
   assert.match(source, /AUTOCOMPLETE_PLACEHOLDERS/);
   assert.match(source, /autocompleteField\("brand", "品牌"/);
-  assert.match(source, /autocompleteField\("name", "系列或名称"/);
+  assert.match(source, /autocompleteField\("name", "商品名"/);
   assert.match(source, /autocompleteField\("flavor", "口味 \/ 肉源"/);
   assert.match(source, /role="listbox"/);
   assert.match(source, /data-autocomplete-option/);

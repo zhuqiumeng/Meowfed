@@ -1,18 +1,18 @@
 const ICONS = {
-  home: "/assets/icons/ddmc-home.svg",
-  add: "/assets/icons/ddmc-add.svg",
-  camera: "/assets/icons/ddmc-camera.svg",
-  list: "/assets/icons/ddmc-list.svg",
-  box: "/assets/icons/ddmc-box.svg",
-  can: "/assets/icons/phosphor-cylinder-light.svg",
-  cat: "/assets/icons/phosphor-cat-thin.svg",
-  eye: "/assets/icons/ddmc-eye.svg",
-  heart: "/assets/icons/ddmc-heart.svg",
-  check: "/assets/icons/ddmc-check.svg",
-  warning: "/assets/icons/ddmc-warning.svg",
-  clock: "/assets/icons/ddmc-clock.svg",
-  back: "/assets/icons/ddmc-back.svg",
-  search: "/assets/icons/ddmc-search.svg"
+  home: "./assets/icons/ddmc-home.svg",
+  add: "./assets/icons/ddmc-add.svg",
+  camera: "./assets/icons/ddmc-camera.svg",
+  list: "./assets/icons/ddmc-list.svg",
+  box: "./assets/icons/ddmc-box.svg",
+  can: "./assets/icons/phosphor-cylinder-light.svg",
+  cat: "./assets/icons/phosphor-cat-thin.svg",
+  eye: "./assets/icons/ddmc-eye.svg",
+  heart: "./assets/icons/ddmc-heart.svg",
+  check: "./assets/icons/ddmc-check.svg",
+  warning: "./assets/icons/ddmc-warning.svg",
+  clock: "./assets/icons/ddmc-clock.svg",
+  back: "./assets/icons/ddmc-back.svg",
+  search: "./assets/icons/ddmc-search.svg"
 };
 
 const FOOD_TYPES = {
@@ -35,7 +35,7 @@ const FOOD_TYPE_ORDER = [
   "other"
 ];
 
-const DEFAULT_CAT_AVATAR = "/assets/cat-profile-default.jpg";
+const DEFAULT_CAT_AVATAR = "./assets/cat-profile-default.jpg";
 const RULE_DAY_MS = window.CatEatRules.DAY_MS;
 const now = Date.now();
 
@@ -176,6 +176,33 @@ function listFoods() {
       const bTime = b.latestResult?.createdAt || b.createdAt;
       return bTime - aTime;
     });
+}
+
+function productIdentity(food) {
+  // 用品牌 + 名称归一化做商品身份；带 _legacyId 的旧数据也参与
+  const brand = normalizeProductText(food.brand);
+  const name = normalizeProductText(food.name);
+  if (!brand && !name) return "";
+  return [brand, name].filter(Boolean).join("::");
+}
+
+function dedupeFoodsForFeed(foods) {
+  // foods 已按"最近一次活动"倒序；保留每组第一条（最新），记下被合并的条数
+  const seen = new Map();
+  const order = [];
+  for (const food of foods) {
+    const key = productIdentity(food) || `id::${food.id}`;
+    if (seen.has(key)) {
+      seen.get(key).mergedCount += 1;
+    } else {
+      seen.set(key, { food, mergedCount: 0 });
+      order.push(key);
+    }
+  }
+  return order.map((key) => {
+    const { food, mergedCount } = seen.get(key);
+    return mergedCount > 0 ? { ...food, _mergedCount: mergedCount } : food;
+  });
 }
 
 function findFood(foodId) {
@@ -421,12 +448,15 @@ function bindDuplicateFoodCheck() {
   });
 }
 
-function autocompleteField(field, label, value, placeholder) {
+function autocompleteField(field, label, value, placeholder, extraClass = "") {
   const inputId = `food-${field}`;
   const listId = `${inputId}-suggestions`;
+  const className = extraClass
+    ? `field-row field-autocomplete ${extraClass}`
+    : "field-row field-autocomplete";
 
   return `
-    <div class="field field-autocomplete" data-autocomplete-field="${field}">
+    <div class="${className}" data-autocomplete-field="${field}">
       <label class="field-label-text" for="${inputId}">${label}</label>
       <input
         id="${inputId}"
@@ -634,7 +664,7 @@ function navStateIcon(key, active) {
   };
   const stateName = active ? "active" : "default";
 
-  return `<img class="nav-state-icon" src="/assets/icons/nav-${iconNames[key]}-${stateName}.svg" alt="" />`;
+  return `<img class="nav-state-icon" src="./assets/icons/nav-${iconNames[key]}-${stateName}.svg" alt="" />`;
 }
 
 function bottomNav(active) {
@@ -683,7 +713,7 @@ function bottomNav(active) {
 }
 
 function home() {
-  const foods = listFoods();
+  const foods = dedupeFoodsForFeed(listFoods());
   const catProfile = readCatProfile();
   const nickname = formatCatNickname(catProfile.nickname);
   const leftColumn = foods.filter((_, index) => index % 2 === 0);
@@ -910,7 +940,7 @@ function textureField(value) {
   const selected = TEXTURE_OPTIONS.includes(value) ? value : TEXTURE_OPTIONS[0];
 
   return `
-    <div class="field custom-select-field" data-texture-select>
+    <div class="field-row custom-select-field" data-texture-select>
       <span id="food-texture-label" class="field-label-text">质地</span>
       <input type="hidden" name="texture" value="${escapeHtml(selected)}" data-texture-value />
       <button
@@ -964,6 +994,7 @@ function addFoodView() {
       <section class="page-intro">
         <h1>${editing ? "修改识别信息" : "先记住它是谁"}</h1>
         <p>食物类型必选，包装、名称或品牌至少留一个。输入品牌、名称或口味时会提示已有记录。</p>
+        <p class="page-intro-tip">赶时间？只拍张包装照就能存，下次再补其他字段。</p>
       </section>
 
       <form id="food-form" data-editing-id="${editing?.id || ""}">
@@ -993,10 +1024,10 @@ function addFoodView() {
         </fieldset>
 
         <section class="form-card">
+          ${autocompleteField("name", "商品名", editing?.name, "例如 GrandaPet 菲力系列纯鸡肉 85g", "field-name")}
           ${autocompleteField("brand", "品牌", editing?.brand, "例如 Catz Finefood")}
-          ${autocompleteField("name", "系列或名称", editing?.name, "例如 鸡肉火鸡主食罐")}
-          <label class="field">
-            <span>规格</span>
+          <label class="field-row">
+            <span class="field-label-text">规格</span>
             <input name="specification" value="${escapeHtml(editing?.specification || "")}" placeholder="例如 85g" />
           </label>
           ${autocompleteField("flavor", "口味 / 肉源", editing?.flavor, "例如 鸡肉、火鸡")}
@@ -1006,7 +1037,7 @@ function addFoodView() {
         <section class="duplicate-food-notice" data-duplicate-food-notice role="status" aria-live="polite" hidden></section>
 
         <p class="helper-text">包装识别将在下一阶段接入。现在照片会先作为你认出同款的凭证。</p>
-        <button class="primary-button sticky-action" type="submit">${editing ? "保存修改" : "加入试吃清单"}</button>
+        <button class="primary-button sticky-action" type="submit">${editing ? "保存修改" : "加入清单"}</button>
       </form>
     </main>
   `;
@@ -1341,6 +1372,7 @@ function library() {
 }
 
 function route(screen, params = {}, replace = false) {
+  const prevScreen = state.screen;
   state.screen = screen === "record" ? "home" : screen;
   state.pickerOpen = false;
   state.pickerExpanded = false;
@@ -1356,16 +1388,48 @@ function route(screen, params = {}, replace = false) {
     state.selectedFoodId = "";
   }
 
-  const search = new URLSearchParams();
-  search.set("screen", state.screen);
-  if (state.selectedFoodId && ["detail", "feedback", "add"].includes(state.screen)) {
-    search.set("id", state.selectedFoodId);
-  }
+  const search = buildSearchParams();
+
+  // 离开旧 screen 前，保存它的滚动位置
+  saveScrollPosition(prevScreen);
 
   const method = replace ? "replaceState" : "pushState";
   history[method](null, "", `?${search.toString()}`);
   render();
-  window.scrollTo(0, 0);
+  // 进入新 screen 后恢复滚动位置（如果没有则保持 0）
+  restoreScrollPosition(state.screen);
+}
+
+function saveScrollPosition(screenKey) {
+  if (!screenKey) return;
+  try {
+    sessionStorage.setItem(`scroll:${screenKey}`, String(window.scrollY));
+  } catch (error) {
+    // sessionStorage 不可用时静默忽略
+  }
+}
+
+function restoreScrollPosition(screenKey) {
+  if (!screenKey) {
+    window.scrollTo(0, 0);
+    return;
+  }
+  let saved = null;
+  try {
+    saved = sessionStorage.getItem(`scroll:${screenKey}`);
+  } catch (error) {
+    saved = null;
+  }
+  if (saved === null) {
+    window.scrollTo(0, 0);
+    return;
+  }
+  const target = Number(saved);
+  if (Number.isFinite(target) && target > 0) {
+    requestAnimationFrame(() => window.scrollTo(0, target));
+  } else {
+    window.scrollTo(0, 0);
+  }
 }
 
 function showToast(message) {
@@ -1373,6 +1437,32 @@ function showToast(message) {
   toast.classList.add("show");
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+// 把当前 state 序列化成 URL 查询串；library 内部状态变更后用 replaceState 同步
+function buildSearchParams() {
+  const search = new URLSearchParams();
+  search.set("screen", state.screen);
+  if (state.selectedFoodId && ["detail", "feedback", "add"].includes(state.screen)) {
+    search.set("id", state.selectedFoodId);
+  }
+  if (state.screen === "library") {
+    if (state.libraryGroup && state.libraryGroup !== "buy") {
+      search.set("group", state.libraryGroup);
+    }
+    if (state.libraryType) {
+      search.set("type", state.libraryType);
+    }
+    if (state.libraryQuery) {
+      search.set("q", state.libraryQuery);
+    }
+  }
+  return search;
+}
+
+function syncLibraryUrl() {
+  if (state.screen !== "library") return;
+  history.replaceState(null, "", `?${buildSearchParams().toString()}`);
 }
 
 function compressImage(file) {
@@ -1431,8 +1521,9 @@ async function submitFood(form) {
   try {
     await dataStore.saveFood(food, { photoDataUrl: state.photoDataUrl });
     state.photoDataUrl = "";
-    route("detail", { id: food.id });
-    showToast(existing ? "修改已经保存" : "已经加入试吃清单");
+    // 用 replaceState 覆盖 add 页，back 一次直接回上一级（home / 详情）
+    route("detail", { id: food.id }, true);
+    showToast(existing ? "修改已经保存" : "已经加入清单");
   } catch (error) {
     showToast("照片或数据暂时没有保存成功");
   }
@@ -2055,6 +2146,7 @@ function bindEvents() {
   librarySearch?.addEventListener("input", () => {
     state.libraryQuery = librarySearch.value;
     refreshLibraryBrowser();
+    syncLibraryUrl();
   });
 
   const libraryBrowser = document.querySelector("[data-library-browser]");
@@ -2064,6 +2156,7 @@ function bindEvents() {
       state.libraryGroup = groupButton.dataset.libraryGroup;
       state.libraryType = "";
       refreshLibraryBrowser();
+      syncLibraryUrl();
       document.querySelector(`[data-library-group="${state.libraryGroup}"]`)?.focus();
       return;
     }
@@ -2073,6 +2166,7 @@ function bindEvents() {
       const nextType = typeButton.dataset.libraryType;
       state.libraryType = state.libraryType === nextType ? "" : nextType;
       refreshLibraryBrowser();
+      syncLibraryUrl();
     }
   });
 
@@ -2105,6 +2199,7 @@ function render() {
 
 window.addEventListener("popstate", () => {
   const params = new URLSearchParams(location.search);
+  const prevScreen = state.screen;
   state.screen = params.get("screen") === "record" ? "home" : params.get("screen") || "home";
   state.selectedFoodId = params.get("id") || "";
   state.selectedOutcome = "";
@@ -2114,7 +2209,16 @@ window.addEventListener("popstate", () => {
   state.pickerType = "";
   state.pickerTrigger = "";
   state.profileOpen = false;
+  if (state.screen === "library") {
+    state.libraryGroup = params.get("group") || "buy";
+    state.libraryType = params.get("type") || "";
+    state.libraryQuery = params.get("q") || "";
+  }
+  // 离开旧 screen 时存位置
+  saveScrollPosition(prevScreen);
   render();
+  // 进入新 screen 时恢复
+  restoreScrollPosition(state.screen);
 });
 
 async function bootstrap() {
