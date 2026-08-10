@@ -384,10 +384,10 @@ button:active {
   position: sticky;
   top: max(var(--screen-gutter), env(safe-area-inset-top));
   z-index: 10;
-  background: var(--surface-glass);
-  backdrop-filter: blur(10px) saturate(180%);
-  -webkit-backdrop-filter: blur(10px) saturate(180%);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  border-bottom: 1px solid var(--line);
 }
 
 .brand {
@@ -474,14 +474,15 @@ button:active {
 }
 
 .page-intro-tip {
-  margin-top: 6px !important;
-  padding: 6px 10px;
+  margin: 0 0 16px;
+  padding: 8px 12px;
   border-left: 3px solid var(--lime);
   background: var(--lime-soft);
   border-radius: 6px;
-  color: var(--lime-strong) !important;
-  font-size: 12.5px !important;
+  color: var(--lime-strong);
+  font-size: 13px;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .record-actions {

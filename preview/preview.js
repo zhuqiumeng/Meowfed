@@ -991,11 +991,7 @@ function addFoodView() {
     <main class="screen no-tab add-screen">
       ${topbar(editing ? "编辑食物" : "记一款新品")}
 
-      <section class="page-intro">
-        <h1>${editing ? "修改识别信息" : "先记住它是谁"}</h1>
-        <p>食物类型必选，包装、名称或品牌至少留一个。输入品牌、名称或口味时会提示已有记录。</p>
-        <p class="page-intro-tip">赶时间？只拍张包装照就能存，下次再补其他字段。</p>
-      </section>
+      <aside class="page-intro-tip" role="note">赶时间？只拍张包装照就能存，下次再补其他字段。</aside>
 
       <form id="food-form" data-editing-id="${editing?.id || ""}">
         <label class="photo-upload">
