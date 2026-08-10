@@ -384,9 +384,7 @@ button:active {
   position: sticky;
   top: max(var(--screen-gutter), env(safe-area-inset-top));
   z-index: 10;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(14px) saturate(180%);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
+  background: #ffffff;
   border-bottom: 1px solid var(--line);
 }
 
