@@ -19,6 +19,10 @@ const previewServer = readFileSync(
   join(__dirname, "..", "tools", "serve-preview.js"),
   "utf8"
 );
+const iphonePreview = readFileSync(
+  join(__dirname, "..", "preview", "iphone15pro.html"),
+  "utf8"
+);
 
 test("首页始终提供最近记录信息流与空状态", () => {
   assert.match(source, /id="recent-records-title">最近记录<\/h2>/);
@@ -127,6 +131,26 @@ test("H5 以 390×844 为设计基准并自适应宽高和安全区", () => {
   assert.match(styles, /@media \(orientation: landscape\) and \(max-height: 500px\)/);
 });
 
+test("直接打开 HTML 文件时显示本地服务器说明而不是白屏", () => {
+  assert.match(source, /function renderFileProtocolNotice\(\)/);
+  assert.match(source, /if \(location\.protocol === "file:"\)/);
+  assert.match(source, /请通过本地预览打开/);
+  assert.match(source, /npm run preview/);
+  assert.match(source, /http:\/\/127\.0\.0\.1:4173\//);
+  assert.match(styles, /\.file-preview-notice\s*\{[\s\S]*text-align: center/);
+});
+
+test("iPhone 15 Pro 样机使用 393×852 内容视口并按窗口等比缩放", () => {
+  assert.match(iphonePreview, /width: 393px/);
+  assert.match(iphonePreview, /height: 852px/);
+  assert.match(iphonePreview, /class="dynamic-island"/);
+  assert.match(iphonePreview, /title="猫吃了吗手机预览"/);
+  assert.match(iphonePreview, /function fitDevice\(\)/);
+  assert.match(iphonePreview, /appFrame\.src = `\.\.\/\?screen=/);
+  assert.match(iphonePreview, /--safe-area-top", "59px"/);
+  assert.match(iphonePreview, /--safe-area-bottom", "34px"/);
+});
+
 test("补货清单使用状态 Tab 和按需出现的线框类型胶囊", () => {
   assert.match(source, /libraryGroup: "buy"/);
   assert.match(source, /libraryType: ""/);
@@ -147,7 +171,7 @@ test("补货清单使用状态 Tab 和按需出现的线框类型胶囊", () => 
   assert.match(styles, /\.library-type-chip\s*\{[\s\S]*min-height: 44px/);
   assert.match(
     styles,
-    /\.library-type-chip-label\s*\{[\s\S]*padding: 3px 6px;[\s\S]*border-radius: 3px;[\s\S]*font-size: 12px;[\s\S]*line-height: 14px/
+    /\.library-type-chip-label\s*\{[\s\S]*padding: 3px 6px;[\s\S]*border-radius: 3px;[\s\S]*font-size: 14px;[\s\S]*line-height: 18px/
   );
   assert.match(
     styles,
@@ -155,7 +179,7 @@ test("补货清单使用状态 Tab 和按需出现的线框类型胶囊", () => 
   );
 });
 
-test("补货清单顶部展示单猫头像和可编辑昵称，商品使用类型包装图标", () => {
+test("补货清单顶部展示单猫头像和行内可编辑昵称，商品使用类型包装图标", () => {
   assert.match(dataStoreSource, /CAT_EAT_H5_CAT_PROFILE_V1/);
   assert.match(source, /DEFAULT_CAT_AVATAR = "\.\/assets\/cat-profile-default\.jpg"/);
   assert.match(source, /class="library-cat-profile"/);
@@ -163,13 +187,18 @@ test("补货清单顶部展示单猫头像和可编辑昵称，商品使用类�
   assert.match(source, /class="library-cat-avatar"/);
   assert.match(source, /class="library-avatar-camera"/);
   assert.match(source, /formatCatNickname\(catProfile\.nickname\)/);
+  assert.match(source, /id="cat-profile-inline-form"/);
   assert.match(source, /data-profile-name/);
-  assert.match(source, /编辑昵称/);
+  assert.match(source, /data-edit-profile/);
+  assert.match(source, /data-cancel-profile/);
+  assert.match(source, /aria-label="编辑猫猫昵称"/);
+  assert.match(source, /aria-label="保存昵称"/);
   assert.doesNotMatch(source, /编辑年龄/);
-  assert.match(source, /data-open-profile/);
-  assert.match(source, /querySelectorAll\("\[data-open-profile\]"\)/);
+  assert.doesNotMatch(source, /catProfileDialog/);
+  assert.doesNotMatch(source, /data-open-profile/);
+  assert.doesNotMatch(source, /保存昵称<\/button>/);
   assert.match(source, /data-profile-photo-input/);
-  assert.match(source, /id="cat-profile-form"/);
+  assert.doesNotMatch(source, /class="library-profile-total"/);
   assert.match(source, /class="library-sheet"/);
   assert.match(source, /productThumbnail: true/);
   assert.match(source, /uiIcon\(iconName, "product-fallback", label\)/);
@@ -178,10 +207,32 @@ test("补货清单顶部展示单猫头像和可编辑昵称，商品使用类�
   assert.match(styles, /\.library-cat-profile::before,[\s\S]*filter: blur\(46px\)/);
   assert.match(styles, /\.library-cat-avatar\s*\{[\s\S]*width: 112px;[\s\S]*border-radius: 50%/);
   assert.match(styles, /\.library-profile-stats\s*\{[\s\S]*backdrop-filter: blur\(18px\) saturate\(150%\)/);
+  assert.match(styles, /\.library-profile-name-form input\s*\{[\s\S]*font-size: 16px/);
+  assert.match(styles, /\.library-name-action\s*\{[\s\S]*width: 44px;[\s\S]*height: 44px/);
   assert.match(styles, /\.library-sheet\s*\{[\s\S]*margin-top: -30px;[\s\S]*border-radius: 30px 30px 0 0;[\s\S]*backdrop-filter: blur\(28px\) saturate\(145%\)/);
   assert.match(styles, /\.product-thumb-staple_can,[\s\S]*\.product-thumb-snack_can/);
   assert.match(styles, /\.icon-can\s*\{[\s\S]*phosphor-cylinder-light\.svg/);
   assert.match(styles, /\.food-row\s*\{[\s\S]*min-width: 0;[\s\S]*max-width: 100%/);
+});
+
+test("补货清单使用轻量搜索、清晰状态 Tab 和图标关闭按钮", () => {
+  assert.match(source, /placeholder="搜品牌、口味或质地"/);
+  assert.match(source, /class="icon-button modal-close-button"[\s\S]*aria-label="关闭"/);
+  assert.doesNotMatch(source, />关闭<\/button>/);
+  assert.match(styles, /\.library-sheet \.search-input\s*\{[\s\S]*font-size: 16px/);
+  assert.match(styles, /\.library-tab\.active::after\s*\{[\s\S]*background: currentColor/);
+  assert.match(styles, /\.modal-close-button\s*\{[\s\S]*width: 44px;[\s\S]*height: 44px/);
+  assert.match(source, /data-library-search[\s\S]*data-mobile-keyboard[\s\S]*inputmode="search"/);
+  assert.match(styles, /\.library-sheet \.search-wrap:focus-within\s*\{[\s\S]*outline: 0;[\s\S]*box-shadow: none/);
+});
+
+test("手机安全区、吸顶栏和文字输入使用机型自适应约束", () => {
+  assert.match(styles, /--safe-area-top: env\(safe-area-inset-top, 0px\)/);
+  assert.match(styles, /--safe-area-bottom: env\(safe-area-inset-bottom, 0px\)/);
+  assert.match(styles, /\.screen\.no-tab > \.topbar\s*\{[\s\S]*position: sticky;[\s\S]*top: 0;[\s\S]*padding: var\(--safe-area-top\)/);
+  assert.match(source, /data-mobile-keyboard/);
+  assert.doesNotMatch(source, /包装识别将在下一阶段接入/);
+  assert.match(styles, /\.add-screen \.form-card input:focus[\s\S]*outline: 0;[\s\S]*box-shadow: none/);
 });
 
 test("H5 UI 仅通过统一数据访问层读写持久数据", () => {
@@ -262,14 +313,15 @@ test("底部导航使用统一线描图标、全局记录动作和独立安全�
   assert.match(source, /aria-label="添加记录"/);
   assert.match(source, /data-nav="\$\{key\}"/);
   assert.match(source, /data-open-picker/);
-  assert.match(source, /function navStateIcon\(key, active\)/);
-  assert.match(source, /nav-\$\{iconNames\[key\]\}-\$\{stateName\}\.svg/);
+  assert.match(source, /function navStateIcon\(key\)/);
+  assert.match(source, /nav-state-\$\{key\}/);
+  assert.doesNotMatch(source, /const stateName = active/);
   assert.match(source, /const destination = key === "record" \? "add" : key/);
   assert.match(styles, /--nav-content-height: 48px/);
   assert.match(styles, /--nav-active: #4571fc/);
   assert.match(
     styles,
-    /\/\* Bottom navigation · 390 × 48 reference plus the device safe area\.[\s\S]*\.bottom-nav\s*\{[\s\S]*height: calc\(var\(--nav-content-height\) \+ env\(safe-area-inset-bottom\)\);[\s\S]*padding: 0 0 env\(safe-area-inset-bottom\);[\s\S]*background: #f7f7f7;[\s\S]*box-shadow: inset 0 0\.5px 0 #e6e6e6/
+    /\/\* Bottom navigation · 390 × 48 reference plus the device safe area\.[\s\S]*\.bottom-nav\s*\{[\s\S]*height: calc\(var\(--nav-content-height\) \+ var\(--safe-area-bottom\)\);[\s\S]*padding: 0 0 var\(--safe-area-bottom\);[\s\S]*background: #f7f7f7;[\s\S]*box-shadow: inset 0 0\.5px 0 #e6e6e6/
   );
   assert.match(
     styles,
@@ -279,13 +331,13 @@ test("底部导航使用统一线描图标、全局记录动作和独立安全�
     styles,
     /\/\* Bottom navigation · 390 × 48 reference plus the device safe area\.[\s\S]*\.nav-item\.active,[\s\S]*color: #4571fc/
   );
-  assert.match(styles, /\.nav-state-icon\s*\{[\s\S]*height: 32px/);
+  assert.match(styles, /\.nav-state-icon\s*\{[\s\S]*width: 32px;[\s\S]*height: 32px;[\s\S]*background: currentColor/);
+  assert.match(styles, /\.nav-state-home\s*\{[\s\S]*nav-home-default\.svg/);
+  assert.match(styles, /\.nav-state-record\s*\{[\s\S]*nav-add-default\.svg/);
+  assert.match(styles, /\.nav-state-library\s*\{[\s\S]*nav-can-default\.svg/);
   [
-    "nav-home-active.svg",
     "nav-home-default.svg",
-    "nav-add-active.svg",
     "nav-add-default.svg",
-    "nav-can-active.svg",
     "nav-can-default.svg"
   ].forEach((file) => {
     assert.ok(existsSync(join(__dirname, "..", "assets", "icons", file)));

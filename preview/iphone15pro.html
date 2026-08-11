@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>猫吃了吗 · iPhone 15 Pro 预览</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        margin: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 24% 18%, rgba(153, 187, 255, 0.18), transparent 32%),
+          radial-gradient(circle at 78% 78%, rgba(165, 232, 197, 0.14), transparent 30%),
+          #eef0f5;
+        color: #17181b;
+      }
+
+      .preview-layout {
+        display: grid;
+        justify-items: center;
+        gap: 12px;
+      }
+
+      .preview-label {
+        margin: 0;
+        color: #656a75;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+
+      .device-stage {
+        position: relative;
+      }
+
+      .device {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 421px;
+        height: 880px;
+        padding: 14px;
+        border: 1px solid #57565d;
+        border-radius: 62px;
+        background: #171719;
+        box-shadow:
+          0 28px 70px rgba(25, 29, 42, 0.24),
+          inset 0 0 0 1px #77757d;
+        transform: scale(var(--device-scale, 1));
+        transform-origin: top left;
+      }
+
+      .screen {
+        position: relative;
+        width: 393px;
+        height: 852px;
+        overflow: hidden;
+        border-radius: 49px;
+        background: #fafafa;
+      }
+
+      .screen iframe {
+        width: 393px;
+        height: 852px;
+        display: block;
+        border: 0;
+        background: #fafafa;
+      }
+
+      .dynamic-island {
+        position: absolute;
+        z-index: 3;
+        top: 13px;
+        left: 50%;
+        width: 116px;
+        height: 32px;
+        border-radius: 999px;
+        background: #050505;
+        box-shadow: inset 0 0 0 1px #18181b;
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+
+      .home-indicator {
+        position: absolute;
+        z-index: 3;
+        bottom: 7px;
+        left: 50%;
+        width: 134px;
+        height: 5px;
+        border-radius: 999px;
+        background: rgba(18, 18, 20, 0.78);
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+
+      .side-button {
+        position: absolute;
+        width: 4px;
+        border-radius: 3px;
+        background: #35343a;
+      }
+
+      .action-button {
+        top: 104px;
+        left: -5px;
+        height: 32px;
+      }
+
+      .volume-up {
+        top: 154px;
+        left: -5px;
+        height: 62px;
+      }
+
+      .volume-down {
+        top: 226px;
+        left: -5px;
+        height: 62px;
+      }
+
+      .power-button {
+        top: 176px;
+        right: -5px;
+        height: 86px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="preview-layout">
+      <p class="preview-label">iPhone 15 Pro · 393 × 852 pt</p>
+      <div class="device-stage" data-device-stage>
+        <section class="device" data-device aria-label="iPhone 15 Pro 样机预览">
+          <span class="side-button action-button" aria-hidden="true"></span>
+          <span class="side-button volume-up" aria-hidden="true"></span>
+          <span class="side-button volume-down" aria-hidden="true"></span>
+          <span class="side-button power-button" aria-hidden="true"></span>
+          <div class="screen">
+            <iframe title="猫吃了吗手机预览" data-app-frame></iframe>
+            <span class="dynamic-island" aria-hidden="true"></span>
+            <span class="home-indicator" aria-hidden="true"></span>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const DEVICE_WIDTH = 421;
+      const DEVICE_HEIGHT = 880;
+      const stage = document.querySelector("[data-device-stage]");
+      const device = document.querySelector("[data-device]");
+      const appFrame = document.querySelector("[data-app-frame]");
+      const screen = new URLSearchParams(location.search).get("screen") || "home";
+
+      appFrame.src = `../?screen=${encodeURIComponent(screen)}`;
+      appFrame.addEventListener("load", () => {
+        const appRoot = appFrame.contentDocument?.documentElement;
+        appRoot?.style.setProperty("--safe-area-top", "59px");
+        appRoot?.style.setProperty("--safe-area-bottom", "34px");
+      });
+
+      function fitDevice() {
+        const horizontalRoom = Math.max(280, window.innerWidth - 36);
+        const verticalRoom = Math.max(360, window.innerHeight - 66);
+        const scale = Math.min(horizontalRoom / DEVICE_WIDTH, verticalRoom / DEVICE_HEIGHT, 1);
+        device.style.setProperty("--device-scale", String(scale));
+        stage.style.width = `${DEVICE_WIDTH * scale}px`;
+        stage.style.height = `${DEVICE_HEIGHT * scale}px`;
+      }
+
+      fitDevice();
+      window.addEventListener("resize", fitDevice);
+    </script>
+  </body>
+</html>
