@@ -132,7 +132,7 @@ const state = {
   pickerQuery: "",
   pickerType: "",
   pickerTrigger: "",
-  profileOpen: false
+  profileEditing: false
 };
 
 function clone(value) {
@@ -464,10 +464,13 @@ function autocompleteField(field, label, value, placeholder, extraClass = "") {
         value="${escapeHtml(value || "")}"
         placeholder="${escapeHtml(placeholder)}"
         autocomplete="off"
+        inputmode="text"
+        enterkeyhint="next"
         aria-autocomplete="list"
         aria-controls="${listId}"
         aria-expanded="false"
         data-autocomplete-input="${field}"
+        data-mobile-keyboard
       />
       <div
         id="${listId}"
@@ -656,15 +659,8 @@ function topbar(title, options = {}) {
   `;
 }
 
-function navStateIcon(key, active) {
-  const iconNames = {
-    home: "home",
-    record: "add",
-    library: "can"
-  };
-  const stateName = active ? "active" : "default";
-
-  return `<img class="nav-state-icon" src="./assets/icons/nav-${iconNames[key]}-${stateName}.svg" alt="" />`;
+function navStateIcon(key) {
+  return `<span class="nav-state-icon nav-state-${key}" aria-hidden="true"></span>`;
 }
 
 function bottomNav(active) {
@@ -691,7 +687,7 @@ function bottomNav(active) {
                 ${selected ? 'aria-current="page"' : ""}
               >
                 <span class="nav-icon-shell" aria-hidden="true">
-                  ${navStateIcon(key, selected)}
+                  ${navStateIcon(key)}
                 </span>
                 <span>${label}</span>
               </button>
@@ -701,7 +697,7 @@ function bottomNav(active) {
           return `
             <button class="nav-item nav-item-${key} ${selected ? "active" : ""}" data-nav="${key}" ${selected ? 'aria-current="page"' : ""}>
               <span class="nav-icon-shell" aria-hidden="true">
-                ${navStateIcon(key, selected)}
+                ${navStateIcon(key)}
               </span>
               <span>${label}</span>
             </button>
@@ -881,7 +877,9 @@ function foodPicker() {
             <h2 id="picker-title">立即记录</h2>
             <p>选刚刚喂的，或者拍一款新品</p>
           </span>
-          <button class="text-button" type="button" data-close-picker>关闭</button>
+          <button class="icon-button modal-close-button" type="button" data-close-picker aria-label="关闭">
+            ${uiIcon("close")}
+          </button>
         </div>
         <button class="record-new-action" type="button" data-nav="add">
           <span class="record-new-icon">${uiIcon("camera")}</span>
@@ -902,35 +900,6 @@ function foodPicker() {
         <div class="record-picker-results" data-picker-results>
           ${foodPickerResults()}
         </div>
-      </section>
-    </div>
-  `;
-}
-
-function catProfileDialog() {
-  const profile = readCatProfile();
-  return `
-    <div class="modal-backdrop" data-close-profile>
-      <section class="modal-sheet profile-sheet" role="dialog" aria-modal="true" aria-labelledby="profile-title">
-        <div class="modal-head">
-          <h2 id="profile-title">猫猫昵称</h2>
-          <button class="text-button" type="button" data-close-profile>关闭</button>
-        </div>
-        <form id="cat-profile-form">
-          <label class="profile-name-field">
-            <span>昵称</span>
-            <input
-              data-profile-name
-              name="nickname"
-              type="text"
-              maxlength="20"
-              value="${escapeHtml(profile.nickname)}"
-              placeholder="例如：年糕"
-              required
-            />
-          </label>
-          <button class="primary-button profile-save-button" type="submit">保存昵称</button>
-        </form>
       </section>
     </div>
   `;
@@ -1024,7 +993,14 @@ function addFoodView() {
           ${autocompleteField("brand", "品牌", editing?.brand, "例如 Catz Finefood")}
           <label class="field-row">
             <span class="field-label-text">规格</span>
-            <input name="specification" value="${escapeHtml(editing?.specification || "")}" placeholder="例如 85g" />
+            <input
+              name="specification"
+              value="${escapeHtml(editing?.specification || "")}"
+              placeholder="例如 85g"
+              inputmode="text"
+              enterkeyhint="next"
+              data-mobile-keyboard
+            />
           </label>
           ${autocompleteField("flavor", "口味 / 肉源", editing?.flavor, "例如 鸡肉、火鸡")}
           ${textureField(editing?.texture)}
@@ -1032,7 +1008,6 @@ function addFoodView() {
 
         <section class="duplicate-food-notice" data-duplicate-food-notice role="status" aria-live="polite" hidden></section>
 
-        <p class="helper-text">包装识别将在下一阶段接入。现在照片会先作为你认出同款的凭证。</p>
         <button class="primary-button sticky-action" type="submit">${editing ? "保存修改" : "加入清单"}</button>
       </form>
     </main>
@@ -1315,14 +1290,6 @@ function library() {
   return `
     <main class="screen library-screen">
       <section class="library-cat-profile" aria-label="当前猫咪资料">
-        <header class="library-profile-top">
-          <span class="library-profile-brand">
-            <span class="library-profile-brand-icon">${uiIcon("cat", "", "猫")}</span>
-            猫吃了吗
-          </span>
-          <button class="library-profile-edit" type="button" data-open-profile>编辑昵称</button>
-        </header>
-
         <div class="library-profile-center">
           <label class="library-avatar-action" aria-label="更换猫猫头像">
             <img
@@ -1334,9 +1301,39 @@ function library() {
             <input data-profile-photo-input type="file" accept="image/*" />
             <span class="library-avatar-camera">${uiIcon("camera", "", "更换头像")}</span>
           </label>
-          <button class="library-cat-name" type="button" data-open-profile>
-            ${escapeHtml(formatCatNickname(catProfile.nickname))}
-          </button>
+          <div class="library-profile-name-row">
+            ${
+              state.profileEditing
+                ? `
+                  <form class="library-profile-name-form" id="cat-profile-inline-form">
+                    <label class="visually-hidden" for="library-profile-name-input">猫猫昵称</label>
+                    <input
+                      id="library-profile-name-input"
+                      data-profile-name
+                      name="nickname"
+                      type="text"
+                      maxlength="20"
+                      value="${escapeHtml(catProfile.nickname)}"
+                      placeholder="例如：年糕"
+                      autocomplete="off"
+                      required
+                    />
+                    <button class="library-name-action library-name-save" type="submit" aria-label="保存昵称">
+                      ${uiIcon("check")}
+                    </button>
+                    <button class="library-name-action" type="button" data-cancel-profile aria-label="取消编辑">
+                      ${uiIcon("close")}
+                    </button>
+                  </form>
+                `
+                : `
+                  <button class="library-cat-name" type="button" data-edit-profile aria-label="编辑猫猫昵称">
+                    <span>${escapeHtml(formatCatNickname(catProfile.nickname))}</span>
+                    ${uiIcon("edit", "library-name-edit-icon")}
+                  </button>
+                `
+            }
+          </div>
         </div>
 
         <div class="library-profile-stats" aria-label="猫咪试吃概览">
@@ -1354,7 +1351,18 @@ function library() {
         <section class="search-tools">
           <label class="search-wrap">
             ${uiIcon("search", "search-icon")}
-            <input class="search-input" data-library-search value="${escapeHtml(state.libraryQuery)}" placeholder="搜索品牌或口味" aria-label="搜索食物" />
+            <input
+              class="search-input"
+              data-library-search
+              data-mobile-keyboard
+              type="search"
+              inputmode="search"
+              enterkeyhint="search"
+              autocomplete="off"
+              value="${escapeHtml(state.libraryQuery)}"
+              placeholder="搜品牌、口味或质地"
+              aria-label="搜索食物"
+            />
           </label>
         </section>
 
@@ -1363,7 +1371,6 @@ function library() {
     </main>
     ${bottomNav("library")}
     ${state.pickerOpen ? foodPicker() : ""}
-    ${state.profileOpen ? catProfileDialog() : ""}
   `;
 }
 
@@ -1375,7 +1382,7 @@ function route(screen, params = {}, replace = false) {
   state.pickerQuery = "";
   state.pickerType = "";
   state.pickerTrigger = "";
-  state.profileOpen = false;
+  state.profileEditing = false;
   state.selectedOutcome = "";
 
   if (params.id !== undefined) {
@@ -1919,6 +1926,14 @@ function bindEvents() {
   bindTextureSelect();
   refreshDuplicateFoodNotice();
 
+  document.querySelectorAll("[data-mobile-keyboard]").forEach((input) => {
+    input.addEventListener("pointerdown", () => {
+      if (document.activeElement !== input) {
+        input.focus({ preventScroll: true });
+      }
+    });
+  });
+
   document.querySelectorAll("[data-nav]").forEach((element) => {
     element.addEventListener("click", () => {
       const screen = element.dataset.nav;
@@ -2024,24 +2039,27 @@ function bindEvents() {
     });
   }
 
-  document.querySelectorAll("[data-open-profile]").forEach((element) => {
-    element.addEventListener("click", () => {
-      state.profileOpen = true;
-      render();
-      document.querySelector("[data-profile-name]")?.focus();
-    });
+  document.querySelector("[data-edit-profile]")?.addEventListener("click", () => {
+    state.profileEditing = true;
+    render();
+    const profileName = document.querySelector("[data-profile-name]");
+    profileName?.focus();
+    profileName?.select();
   });
 
-  document.querySelectorAll("[data-close-profile]").forEach((element) => {
-    element.addEventListener("click", (event) => {
-      if (event.target === element || element.matches("button")) {
-        state.profileOpen = false;
-        render();
-      }
-    });
+  document.querySelector("[data-cancel-profile]")?.addEventListener("click", () => {
+    state.profileEditing = false;
+    render();
   });
 
-  document.querySelector("#cat-profile-form")?.addEventListener("submit", async (event) => {
+  document.querySelector("[data-profile-name]")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    state.profileEditing = false;
+    render();
+    document.querySelector("[data-edit-profile]")?.focus();
+  });
+
+  document.querySelector("#cat-profile-inline-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const nickname = String(
       new FormData(event.currentTarget).get("nickname") || ""
@@ -2052,9 +2070,9 @@ function bindEvents() {
     }
     try {
       await writeCatProfile({ ...readCatProfile(), nickname });
-      state.profileOpen = false;
+      state.profileEditing = false;
       render();
-      showToast("猫猫昵称已保存");
+      showToast("昵称已保存");
     } catch (error) {
       showToast("昵称暂时没有保存成功");
     }
@@ -2204,7 +2222,7 @@ window.addEventListener("popstate", () => {
   state.pickerQuery = "";
   state.pickerType = "";
   state.pickerTrigger = "";
-  state.profileOpen = false;
+  state.profileEditing = false;
   if (state.screen === "library") {
     state.libraryGroup = params.get("group") || "buy";
     state.libraryType = params.get("type") || "";
@@ -2235,7 +2253,25 @@ async function bootstrap() {
   }
 }
 
-bootstrap();
+function renderFileProtocolNotice() {
+  app.innerHTML = `
+    <main class="screen no-tab file-preview-screen">
+      <section class="file-preview-notice" role="alert">
+        ${uiIcon("cat", "file-preview-icon", "猫")}
+        <h1>请通过本地预览打开</h1>
+        <p>这个应用需要本地数据库和 PWA 环境，不能直接双击 HTML 文件运行。</p>
+        <code>npm run preview</code>
+        <p>然后打开 <strong>http://127.0.0.1:4173/</strong></p>
+      </section>
+    </main>
+  `;
+}
+
+if (location.protocol === "file:") {
+  renderFileProtocolNotice();
+} else {
+  bootstrap();
+}
 
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
   window.addEventListener("load", () => {

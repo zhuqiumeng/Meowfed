@@ -1,9 +1,11 @@
+@import "/styles/tokens.wxss";
+
 page {
   min-height: 100%;
-  background: #f4f5f1;
-  color: #111713;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
-  font-size: 28rpx;
+  background: var(--c-bg-page-2, #f4f5f1);
+  color: var(--c-ink-primary, #111713);
+  font-family: var(--font-family-base);
+  font-size: var(--fs-root, 28rpx);
 }
 
 view,
