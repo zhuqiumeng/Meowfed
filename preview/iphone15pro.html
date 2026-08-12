@@ -93,6 +93,44 @@
         pointer-events: none;
       }
 
+      .status-bar {
+        position: absolute;
+        z-index: 4;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 59px;
+        color: #080808;
+        pointer-events: none;
+      }
+
+      .status-time {
+        position: absolute;
+        top: 17px;
+        left: 27px;
+        min-width: 54px;
+        font-size: 15px;
+        font-weight: 650;
+        line-height: 20px;
+        letter-spacing: -0.15px;
+        text-align: center;
+      }
+
+      .status-system-icons {
+        position: absolute;
+        top: 20px;
+        right: 25px;
+        width: 77px;
+        height: 14px;
+      }
+
+      .status-system-icons svg {
+        width: 77px;
+        height: 14px;
+        display: block;
+        fill: currentColor;
+      }
+
       .home-indicator {
         position: absolute;
         z-index: 3;
@@ -149,6 +187,18 @@
           <span class="side-button power-button" aria-hidden="true"></span>
           <div class="screen">
             <iframe title="猫吃了吗手机预览" data-app-frame></iframe>
+            <div class="status-bar" aria-label="iPhone 状态栏">
+              <span class="status-time">9:41</span>
+              <span class="status-system-icons" aria-hidden="true">
+                <svg viewBox="0 0 77 14" role="img">
+                  <path d="M1 10.8h3v2H1zm4.6-3h3v5h-3zm4.6-3h3v8h-3zm4.6-3h3v11h-3z" />
+                  <path d="M27.4 5.1a11.3 11.3 0 0 1 15.2 0l-1.8 1.9a8.6 8.6 0 0 0-11.6 0zm3 3.1a6.8 6.8 0 0 1 9.2 0l-1.9 1.9a4.1 4.1 0 0 0-5.4 0zm3.1 3.2a2.2 2.2 0 0 1 3 0L35 13z" />
+                  <rect x="51" y="1" width="22" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1" opacity=".4" />
+                  <rect x="53" y="3" width="17" height="8" rx="1.5" />
+                  <path d="M74 5h2v4h-2z" opacity=".4" />
+                </svg>
+              </span>
+            </div>
             <span class="dynamic-island" aria-hidden="true"></span>
             <span class="home-indicator" aria-hidden="true"></span>
           </div>

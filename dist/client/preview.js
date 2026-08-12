@@ -448,15 +448,12 @@ function bindDuplicateFoodCheck() {
   });
 }
 
-function autocompleteField(field, label, value, placeholder, extraClass = "") {
+function autocompleteField(field, label, value, placeholder) {
   const inputId = `food-${field}`;
   const listId = `${inputId}-suggestions`;
-  const className = extraClass
-    ? `field-row field-autocomplete ${extraClass}`
-    : "field-row field-autocomplete";
 
   return `
-    <div class="${className}" data-autocomplete-field="${field}">
+    <div class="field-row field-autocomplete" data-autocomplete-field="${field}">
       <label class="field-label-text" for="${inputId}">${label}</label>
       <input
         id="${inputId}"
@@ -564,7 +561,7 @@ function statusBadge(food) {
   const compactLabel = compactLabels[food.status.key] || food.status.shortLabel;
 
   return `
-    <span class="status-badge status-${food.status.key}">
+    <span class="status-badge status-tag status-${food.status.key}">
       <span class="status-label-full">${escapeHtml(food.status.shortLabel)}</span>
       <span class="status-label-compact" aria-hidden="true">${escapeHtml(compactLabel)}</span>
     </span>
@@ -589,7 +586,7 @@ function foodRow(food, options = {}) {
         <strong>${escapeHtml(food.name || "未命名食物")}</strong>
         <small>${escapeHtml(meta)}</small>
       </span>
-      ${options.feedback ? `<span class="status-badge status-trial">记录</span>` : statusBadge(food)}
+      ${options.feedback ? `<span class="status-badge status-tag status-trial">记录</span>` : statusBadge(food)}
     </button>
   `;
 }
@@ -629,7 +626,7 @@ function recentFoodCard(food) {
           <span>${escapeHtml(food.flavor || "肉类待补充")}</span>
         </small>
         <span class="recent-card-feedback-row">
-          <span class="recent-feedback-tag feedback-${feedbackKey}">${escapeHtml(feedback)}</span>
+          <span class="recent-feedback-tag status-tag feedback-${feedbackKey}">${escapeHtml(feedback)}</span>
           <time class="recent-card-time" datetime="${new Date(recordedAt).toISOString()}">${formatCardDate(recordedAt)}</time>
         </span>
       </span>
@@ -666,7 +663,7 @@ function navStateIcon(key) {
 function bottomNav(active) {
   const items = [
     ["home", "首页"],
-    ["record", "添加记录"],
+    ["record", "添加"],
     ["library", "清单"]
   ];
 
@@ -683,7 +680,7 @@ function bottomNav(active) {
                 class="nav-item nav-item-record ${selected ? "active" : ""}"
                 type="button"
                 data-nav="add"
-                aria-label="添加记录"
+                aria-label="添加"
                 ${selected ? 'aria-current="page"' : ""}
               >
                 <span class="nav-icon-shell" aria-hidden="true">
@@ -833,7 +830,7 @@ function foodPickerResults() {
                 .map(
                   (type) => `
                     <button
-                      class="record-type-chip ${state.pickerType === type ? "active" : ""}"
+                      class="record-type-chip filter-chip ${state.pickerType === type ? "active" : ""}"
                       type="button"
                       data-picker-type="${type}"
                       aria-pressed="${state.pickerType === type}"
@@ -871,7 +868,6 @@ function foodPicker() {
         aria-labelledby="picker-title"
         tabindex="-1"
       >
-        <span class="record-sheet-grabber" aria-hidden="true"></span>
         <div class="record-picker-head">
           <span>
             <h2 id="picker-title">立即记录</h2>
@@ -900,6 +896,46 @@ function foodPicker() {
         <div class="record-picker-results" data-picker-results>
           ${foodPickerResults()}
         </div>
+      </section>
+    </div>
+  `;
+}
+
+function profileNameSheet(catProfile) {
+  return `
+    <div class="modal-backdrop profile-name-backdrop" data-close-profile>
+      <section
+        class="modal-sheet profile-name-sheet"
+        data-profile-name-sheet
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="profile-name-title"
+        tabindex="-1"
+      >
+        <header class="profile-name-sheet-head">
+          <h2 id="profile-name-title">编辑昵称</h2>
+          <button class="icon-button modal-close-button" type="button" data-close-profile aria-label="关闭昵称编辑">
+            ${uiIcon("close")}
+          </button>
+        </header>
+        <form class="profile-name-sheet-form" id="cat-profile-name-form">
+          <input
+            id="library-profile-name-input"
+            data-profile-name
+            data-mobile-keyboard
+            name="nickname"
+            type="text"
+            aria-label="猫猫昵称"
+            inputmode="text"
+            enterkeyhint="done"
+            maxlength="20"
+            value="${escapeHtml(catProfile.nickname)}"
+            placeholder="例如：年糕"
+            autocomplete="off"
+            required
+          />
+          <button class="primary-button profile-name-save" type="submit">保存</button>
+        </form>
       </section>
     </div>
   `;
@@ -957,14 +993,15 @@ function addFoodView() {
   const photo = state.photoDataUrl || editing?.photoPath || "";
 
   return `
-    <main class="screen no-tab add-screen">
-      ${topbar(editing ? "编辑食物" : "记一款新品")}
+    <section class="fixed-page-shell add-page-shell">
+      ${topbar(editing ? "编辑食物" : "加食物")}
+      <main class="screen no-tab fixed-page-scroll add-screen">
 
       <aside class="page-intro-tip" role="note">赶时间？只拍张包装照就能存，下次再补其他字段。</aside>
 
       <form id="food-form" data-editing-id="${editing?.id || ""}">
         <label class="photo-upload">
-          <input id="photo-input" type="file" accept="image/*" capture="environment" />
+          <input id="photo-input" type="file" accept="image/*" />
           ${
             photo
               ? image(photo, "photo-preview", "包装预览")
@@ -980,7 +1017,7 @@ function addFoodView() {
                 ([value, label]) => `
                   <label class="type-option">
                     <input type="radio" name="foodType" value="${value}" ${value === type ? "checked" : ""} />
-                    <span>${label}</span>
+                    <span class="filter-chip-label">${label}</span>
                   </label>
                 `
               )
@@ -989,8 +1026,8 @@ function addFoodView() {
         </fieldset>
 
         <section class="form-card">
-          ${autocompleteField("name", "商品名", editing?.name, "例如 GrandaPet 菲力系列纯鸡肉 85g", "field-name")}
           ${autocompleteField("brand", "品牌", editing?.brand, "例如 Catz Finefood")}
+          ${autocompleteField("name", "产品名", editing?.name, "例如 GrandaPet 菲力系列纯鸡肉 85g")}
           <label class="field-row">
             <span class="field-label-text">规格</span>
             <input
@@ -1008,9 +1045,12 @@ function addFoodView() {
 
         <section class="duplicate-food-notice" data-duplicate-food-notice role="status" aria-live="polite" hidden></section>
 
-        <button class="primary-button sticky-action" type="submit">${editing ? "保存修改" : "加入清单"}</button>
-      </form>
-    </main>
+        </form>
+      </main>
+      <footer class="fixed-bottom-action add-bottom-action">
+        <button class="primary-button fixed-bottom-action-button add-submit-button" type="submit" form="food-form">${editing ? "保存" : "添加"}</button>
+      </footer>
+    </section>
   `;
 }
 
@@ -1025,8 +1065,9 @@ function feedback() {
   const outcomes = Object.values(rules.OUTCOMES);
 
   return `
-    <main class="screen no-tab feedback-screen">
+    <section class="fixed-page-shell feedback-page-shell">
       ${topbar("记录这次表现")}
+      <main class="screen no-tab fixed-page-scroll feedback-screen">
 
       <section class="identity-row">
         ${thumbnail(food)}
@@ -1060,8 +1101,11 @@ function feedback() {
           .join("")}
       </section>
 
-      <button class="primary-button sticky-action" data-submit-feedback ${state.selectedOutcome ? "" : "disabled"}>保存这次反馈</button>
-    </main>
+      </main>
+      <footer class="fixed-bottom-action feedback-bottom-action">
+        <button class="primary-button fixed-bottom-action-button" data-submit-feedback ${state.selectedOutcome ? "" : "disabled"}>保存</button>
+      </footer>
+    </section>
   `;
 }
 
@@ -1075,12 +1119,13 @@ function detail() {
     return home();
   }
 
-  const history = (food.results || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+  const feedbackHistory = (food.results || []).slice().sort((a, b) => b.createdAt - a.createdAt);
   const progressWidth = `${Math.min(food.progress / 3, 1) * 100}%`;
 
   return `
-    <main class="screen no-tab detail-screen">
+    <section class="fixed-page-shell detail-page-shell">
       ${topbar("食物详情", { action: `<button class="topbar-action" data-edit-food="${food.id}">编辑</button>` })}
+      <main class="screen no-tab fixed-page-scroll detail-screen">
 
       <section class="detail-card">
         ${thumbnail(food)}
@@ -1111,10 +1156,10 @@ function detail() {
       <section class="section">
         <div class="section-heading"><div><h2>反馈历史</h2><p>旧记录会保留，当前判断只看最近 90 天</p></div></div>
         ${
-          history.length
+          feedbackHistory.length
             ? `
               <div class="history">
-                ${history
+                ${feedbackHistory
                   .map((item) => {
                     const outcome = rules.OUTCOMES[item.outcome];
                     return `
@@ -1135,8 +1180,9 @@ function detail() {
         }
       </section>
 
-      <button class="danger-button" data-delete-food="${food.id}">删除这款食物</button>
-    </main>
+        <button class="danger-button" data-delete-food="${food.id}">删除这款食物</button>
+      </main>
+    </section>
   `;
 }
 
@@ -1214,7 +1260,7 @@ function libraryBrowserHtml() {
           ([key, title]) => `
             <button
               id="library-tab-${key}"
-              class="library-tab ${state.libraryGroup === key ? "active" : ""}"
+              class="library-tab status-tab ${state.libraryGroup === key ? "active" : ""}"
               type="button"
               role="tab"
               aria-selected="${state.libraryGroup === key}"
@@ -1245,7 +1291,7 @@ function libraryBrowserHtml() {
                 .map(
                   (type) => `
                     <button
-                      class="library-type-chip ${state.libraryType === type ? "active" : ""}"
+                      class="library-type-chip filter-chip ${state.libraryType === type ? "active" : ""}"
                       type="button"
                       aria-pressed="${state.libraryType === type}"
                       data-library-type="${type}"
@@ -1302,37 +1348,10 @@ function library() {
             <span class="library-avatar-camera">${uiIcon("camera", "", "更换头像")}</span>
           </label>
           <div class="library-profile-name-row">
-            ${
-              state.profileEditing
-                ? `
-                  <form class="library-profile-name-form" id="cat-profile-inline-form">
-                    <label class="visually-hidden" for="library-profile-name-input">猫猫昵称</label>
-                    <input
-                      id="library-profile-name-input"
-                      data-profile-name
-                      name="nickname"
-                      type="text"
-                      maxlength="20"
-                      value="${escapeHtml(catProfile.nickname)}"
-                      placeholder="例如：年糕"
-                      autocomplete="off"
-                      required
-                    />
-                    <button class="library-name-action library-name-save" type="submit" aria-label="保存昵称">
-                      ${uiIcon("check")}
-                    </button>
-                    <button class="library-name-action" type="button" data-cancel-profile aria-label="取消编辑">
-                      ${uiIcon("close")}
-                    </button>
-                  </form>
-                `
-                : `
-                  <button class="library-cat-name" type="button" data-edit-profile aria-label="编辑猫猫昵称">
-                    <span>${escapeHtml(formatCatNickname(catProfile.nickname))}</span>
-                    ${uiIcon("edit", "library-name-edit-icon")}
-                  </button>
-                `
-            }
+            <button class="library-cat-name" type="button" data-edit-profile aria-label="编辑猫猫昵称">
+              <span>${escapeHtml(formatCatNickname(catProfile.nickname))}</span>
+              ${uiIcon("edit", "library-name-edit-icon")}
+            </button>
           </div>
         </div>
 
@@ -1371,6 +1390,7 @@ function library() {
     </main>
     ${bottomNav("library")}
     ${state.pickerOpen ? foodPicker() : ""}
+    ${state.profileEditing ? profileNameSheet(catProfile) : ""}
   `;
 }
 
@@ -2047,19 +2067,23 @@ function bindEvents() {
     profileName?.select();
   });
 
-  document.querySelector("[data-cancel-profile]")?.addEventListener("click", () => {
-    state.profileEditing = false;
-    render();
+  document.querySelectorAll("[data-close-profile]").forEach((element) => {
+    element.addEventListener("click", (event) => {
+      if (event.target !== element && !element.matches("button")) return;
+      state.profileEditing = false;
+      render();
+      document.querySelector("[data-edit-profile]")?.focus();
+    });
   });
 
-  document.querySelector("[data-profile-name]")?.addEventListener("keydown", (event) => {
+  document.querySelector("[data-profile-name-sheet]")?.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     state.profileEditing = false;
     render();
     document.querySelector("[data-edit-profile]")?.focus();
   });
 
-  document.querySelector("#cat-profile-inline-form")?.addEventListener("submit", async (event) => {
+  document.querySelector("#cat-profile-name-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const nickname = String(
       new FormData(event.currentTarget).get("nickname") || ""
