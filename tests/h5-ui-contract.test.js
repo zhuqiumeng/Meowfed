@@ -32,6 +32,8 @@ test("首页始终提供最近记录信息流与空状态", () => {
   assert.match(source, /id="recent-records-title">最近记录<\/h2>/);
   assert.match(source, /还没有最近记录/);
   assert.match(source, /已经到底了哟/);
+  assert.match(source, /class="home-record-action"[\s\S]*data-open-picker[\s\S]*记录已有食物[\s\S]*几秒记完/);
+  assert.match(source, /class="primary-button recent-empty-primary"[\s\S]*data-nav="add">拍下第一款/);
 });
 
 test("一级页面和最近区块不展示副标题", () => {
@@ -61,21 +63,16 @@ test("首页问候读取用户设置的猫猫昵称", () => {
   );
 });
 
-test("最近记录按时间排序并使用双列九像素信息流", () => {
-  assert.match(source, /const leftColumn = foods\.filter\(\(_, index\) => index % 2 === 0\)/);
-  assert.match(source, /const rightColumn = foods\.filter\(\(_, index\) => index % 2 === 1\)/);
+test("最近记录按时间顺序使用单一 DOM 的双列九像素信息流", () => {
   assert.match(source, /class="recent-food-grid"/);
-  assert.match(source, /class="recent-food-column"/);
+  assert.match(source, /\$\{foods\.map\(recentFoodCard\)\.join\(""\)\}/);
+  assert.doesNotMatch(source, /leftColumn|rightColumn|recent-food-column/);
   assert.match(source, /class="recent-food-card"/);
   assert.match(source, /class="recent-card-media /);
   assert.match(source, /class="recent-feedback-tag/);
   assert.match(
     styles,
     /\.recent-food-grid\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*gap: 9px/
-  );
-  assert.match(
-    styles,
-    /\.recent-food-column\s*\{[\s\S]*flex-direction: column;[\s\S]*gap: 9px/
   );
 });
 
@@ -138,6 +135,43 @@ test("H5 以 390×844 为设计基准并自适应宽高和安全区", () => {
   assert.match(styles, /#app\s*\{[\s\S]*background-origin: border-box;[\s\S]*background-position: 0 0/);
   assert.match(styles, /\.screen:not\(\.library-screen\)\s*\{[\s\S]*background-origin: border-box;[\s\S]*background-position: 0 0/);
   assert.match(styles, /\.library-cat-profile\s*\{[\s\S]*background-origin: border-box;[\s\S]*background-position: 0 0/);
+});
+
+test("真机状态栏跟随当前页面顶部背景而不是外层灰色画布", () => {
+  assert.match(source, /const PAGE_THEME_COLORS = \{[\s\S]*home: "#f7f9ff"[\s\S]*library: "#edf8ff"[\s\S]*detail: "#ffffff"/);
+  assert.match(source, /document\.documentElement\.dataset\.screen = screen/);
+  assert.match(source, /document\.body\.dataset\.screen = screen/);
+  assert.match(source, /meta\[name="theme-color"\][\s\S]*PAGE_THEME_COLORS\[screen\]/);
+  assert.match(styles, /html\[data-screen="home"\],[\s\S]*body\[data-screen="home"\][\s\S]*--page-chrome-background:/);
+  assert.match(styles, /html\[data-screen="library"\],[\s\S]*body\[data-screen="library"\][\s\S]*linear-gradient\(128deg, #edf8ff/);
+  assert.match(styles, /html\[data-screen="add"\],[\s\S]*body\[data-screen="detail"\][\s\S]*--page-chrome-background: #ffffff/);
+  assert.match(styles, /\.fixed-page-shell\s*\{[\s\S]*background: #ffffff/);
+  assert.doesNotMatch(styles, /html\s*\{[\s\S]*background: #f2f3f7/);
+  assert.doesNotMatch(styles, /body\s*\{[\s\S]*background: #f2f3f7/);
+});
+
+test("详情内保存表现会回退原详情，快速记录则覆盖为详情", () => {
+  assert.match(source, /const historyEntry = \{ screen: state\.screen \}/);
+  assert.match(source, /if \(state\.screen === "feedback"\) \{[\s\S]*historyEntry\.from = prevScreen/);
+  assert.match(source, /async function submitFeedback\(\)[\s\S]*history\.state\?\.from === "detail"[\s\S]*history\.back\(\)[\s\S]*route\("detail", \{ id: updated\.id \}, true\)/);
+});
+
+test("零反馈食物显示灰色未评价标签", () => {
+  assert.match(source, /if \(!\(food\.results \|\| \[\]\)\.length\) \{[\s\S]*status-unrated[\s\S]*未评价/);
+  assert.match(source, /const feedbackKey = latestRecordedResult\?\.outcome \|\| "unrated"/);
+  assert.match(source, /unrated: "未评价"/);
+  assert.match(styles, /\.status-unrated,[\s\S]*\.feedback-unrated,[\s\S]*background: var\(--gray-soft\)/);
+});
+
+test("反馈支持最多 120 字可选备注并写入结果", () => {
+  assert.match(source, /data-feedback-note[\s\S]*maxlength="120"[\s\S]*placeholder="例如：加了冻干才愿意吃"/);
+  assert.match(source, /note: state\.feedbackNote\.trim\(\)/);
+  assert.match(source, /state\.feedbackNote = event\.currentTarget\.value\.slice\(0, 120\)/);
+  assert.match(styles, /\.feedback-note-field textarea\s*\{[\s\S]*min-height: 72px;[\s\S]*font-size: 16px/);
+});
+
+test("清单状态 Tab 只接受横向触摸手势", () => {
+  assert.match(styles, /\.library-tabs\s*\{[\s\S]*overflow-x: auto;[\s\S]*overflow-y: hidden;[\s\S]*overscroll-behavior-y: none;[\s\S]*touch-action: pan-x/);
 });
 
 test("直接打开 HTML 文件时显示本地服务器说明而不是白屏", () => {
@@ -296,7 +330,8 @@ test("H5 UI 仅通过统一数据访问层读写持久数据", () => {
 });
 
 test("全局使用 FAFAFA 画布和克制的彩色弥散背景", () => {
-  const diffuseLayers = styles.match(/radial-gradient\(/g) || [];
+  const appBackground = styles.match(/#app\s*\{[\s\S]*?\n\}/)?.[0] || "";
+  const diffuseLayers = appBackground.match(/radial-gradient\(/g) || [];
 
   assert.match(styles, /--canvas: #fafafa/);
   assert.match(styles, /--paper: rgba\(255, 255, 255, 0\.82\)/);

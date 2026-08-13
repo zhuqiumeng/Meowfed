@@ -118,11 +118,19 @@ const app = document.querySelector("#app");
 const toast = document.querySelector("#toast");
 const rules = window.CatEatRules;
 const dataStore = window.CatEatData;
+const PAGE_THEME_COLORS = {
+  home: "#f7f9ff",
+  library: "#edf8ff",
+  add: "#ffffff",
+  feedback: "#ffffff",
+  detail: "#ffffff"
+};
 
 const state = {
   screen: new URLSearchParams(location.search).get("screen") || "home",
   selectedFoodId: new URLSearchParams(location.search).get("id") || "",
   selectedOutcome: "",
+  feedbackNote: "",
   photoDataUrl: "",
   libraryQuery: "",
   libraryGroup: "buy",
@@ -549,6 +557,15 @@ function productThumbnail(food) {
 }
 
 function statusBadge(food) {
+  if (!(food.results || []).length) {
+    return `
+      <span class="status-badge status-tag status-unrated">
+        <span class="status-label-full">未评价</span>
+        <span class="status-label-compact" aria-hidden="true">未评价</span>
+      </span>
+    `;
+  }
+
   const compactLabels = {
     trial: "再试",
     repurchase: "放心",
@@ -592,16 +609,20 @@ function foodRow(food, options = {}) {
 }
 
 function recentFoodCard(food) {
-  const feedbackKey = food.latestResult?.outcome || "unknown";
+  const latestRecordedResult = (food.results || [])
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt)[0] || null;
+  const feedbackKey = latestRecordedResult?.outcome || "unrated";
   const feedbackLabels = {
     eager: "主动吃",
     okay: "正常接受",
     reluctant: "勉强吃",
     bury: "埋屎",
-    unknown: "没法判断"
+    unknown: "没法判断",
+    unrated: "未评价"
   };
   const feedback = feedbackLabels[feedbackKey] || feedbackLabels.unknown;
-  const recordedAt = food.latestResult?.createdAt || food.createdAt;
+  const recordedAt = latestRecordedResult?.createdAt || food.createdAt;
   const title = [
     food.brand || "品牌待补充",
     food.name || "未命名食物",
@@ -709,8 +730,6 @@ function home() {
   const foods = dedupeFoodsForFeed(listFoods());
   const catProfile = readCatProfile();
   const nickname = formatCatNickname(catProfile.nickname);
-  const leftColumn = foods.filter((_, index) => index % 2 === 0);
-  const rightColumn = foods.filter((_, index) => index % 2 === 1);
 
   return `
     <main class="screen home-screen">
@@ -720,14 +739,29 @@ function home() {
           <span>这次吃的怎么样？</span>
         </h1>
 
+        ${
+          foods.length
+            ? `
+              <button
+                class="home-record-action"
+                type="button"
+                data-open-picker
+                data-record-trigger="home-greeting"
+              >
+                <span class="home-record-action-icon">${uiIcon("clock")}</span>
+                <span><strong>记录已有食物</strong><small>选刚刚喂的，几秒记完</small></span>
+              </button>
+            `
+            : ""
+        }
+
         <section class="home-recent" aria-labelledby="recent-records-title">
           <h2 class="home-recent-heading" id="recent-records-title">最近记录</h2>
           ${
             foods.length
               ? `
                 <div class="recent-food-grid" aria-label="最近记录，越近添加的越靠前">
-                  <div class="recent-food-column">${leftColumn.map(recentFoodCard).join("")}</div>
-                  <div class="recent-food-column">${rightColumn.map(recentFoodCard).join("")}</div>
+                  ${foods.map(recentFoodCard).join("")}
                 </div>
                 <div class="home-feed-end" role="note" aria-label="已经到底了哟">
                   <span></span><strong>已经到底了哟</strong><span></span>
@@ -740,7 +774,10 @@ function home() {
                     <strong>还没有最近记录</strong>
                     <p>拍下第一款后，最近吃过的会出现在这里。</p>
                   </span>
-                  <button class="text-button" data-load-demo>载入示例</button>
+                  <span class="recent-empty-actions">
+                    <button class="primary-button recent-empty-primary" type="button" data-nav="add">拍下第一款</button>
+                    <button class="text-button" type="button" data-load-demo>载入示例</button>
+                  </span>
                 </div>
               `
           }
@@ -1101,6 +1138,16 @@ function feedback() {
           .join("")}
       </section>
 
+      <label class="feedback-note-field">
+        <span>备注 <small>选填，最多 120 字</small></span>
+        <textarea
+          data-feedback-note
+          maxlength="120"
+          rows="2"
+          placeholder="例如：加了冻干才愿意吃"
+        >${escapeHtml(state.feedbackNote)}</textarea>
+      </label>
+
       </main>
       <footer class="fixed-bottom-action feedback-bottom-action">
         <button class="primary-button fixed-bottom-action-button" data-submit-feedback ${state.selectedOutcome ? "" : "disabled"}>保存</button>
@@ -1404,6 +1451,7 @@ function route(screen, params = {}, replace = false) {
   state.pickerTrigger = "";
   state.profileEditing = false;
   state.selectedOutcome = "";
+  state.feedbackNote = "";
 
   if (params.id !== undefined) {
     state.selectedFoodId = params.id;
@@ -1417,7 +1465,11 @@ function route(screen, params = {}, replace = false) {
   saveScrollPosition(prevScreen);
 
   const method = replace ? "replaceState" : "pushState";
-  history[method](null, "", `?${search.toString()}`);
+  const historyEntry = { screen: state.screen };
+  if (state.screen === "feedback") {
+    historyEntry.from = prevScreen;
+  }
+  history[method](historyEntry, "", `?${search.toString()}`);
   render();
   // 进入新 screen 后恢复滚动位置（如果没有则保持 0）
   restoreScrollPosition(state.screen);
@@ -1567,6 +1619,7 @@ async function submitFeedback() {
     let updated = await dataStore.addResult(food.id, {
       id: createId("result"),
       outcome: state.selectedOutcome,
+      note: state.feedbackNote.trim(),
       createdAt: Date.now(),
       updatedAt: Date.now()
     });
@@ -1575,8 +1628,16 @@ async function submitFeedback() {
       updated = await dataStore.updateFood(food.id, { everQualified: true });
     }
     state.selectedOutcome = "";
-    route("detail", { id: updated.id });
-    showToast("这次表现已经记住");
+    state.feedbackNote = "";
+    if (history.state?.from === "detail") {
+      // 回退到原详情历史项，避免产生“详情 → 反馈 → 详情”的重复栈。
+      showToast("这次表现已经记住");
+      history.back();
+    } else {
+      // 从首页或清单的快速记录进入时，保存后仍展示最新判断。
+      route("detail", { id: updated.id }, true);
+      showToast("这次表现已经记住");
+    }
   } catch (error) {
     showToast("这次反馈暂时没有保存成功");
   }
@@ -2122,6 +2183,10 @@ function bindEvents() {
     });
   });
 
+  document.querySelector("[data-feedback-note]")?.addEventListener("input", (event) => {
+    state.feedbackNote = event.currentTarget.value.slice(0, 120);
+  });
+
   document.querySelector("[data-submit-feedback]")?.addEventListener("click", submitFeedback);
 
   document.querySelector("[data-edit-food]")?.addEventListener("click", (event) => {
@@ -2231,7 +2296,13 @@ function render() {
     library
   };
 
-  app.innerHTML = (views[state.screen] || home)();
+  const screen = views[state.screen] ? state.screen : "home";
+  document.documentElement.dataset.screen = screen;
+  document.body.dataset.screen = screen;
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", PAGE_THEME_COLORS[screen] || PAGE_THEME_COLORS.home);
+  app.innerHTML = (views[screen] || home)();
   bindEvents();
 }
 
@@ -2241,6 +2312,7 @@ window.addEventListener("popstate", () => {
   state.screen = params.get("screen") === "record" ? "home" : params.get("screen") || "home";
   state.selectedFoodId = params.get("id") || "";
   state.selectedOutcome = "";
+  state.feedbackNote = "";
   state.pickerOpen = false;
   state.pickerExpanded = false;
   state.pickerQuery = "";
