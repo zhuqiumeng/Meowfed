@@ -213,8 +213,9 @@
       const device = document.querySelector("[data-device]");
       const appFrame = document.querySelector("[data-app-frame]");
       const screen = new URLSearchParams(location.search).get("screen") || "home";
+      const previewVersion = "29";
 
-      appFrame.src = `../?screen=${encodeURIComponent(screen)}`;
+      appFrame.src = `../?screen=${encodeURIComponent(screen)}&preview=${previewVersion}`;
       appFrame.addEventListener("load", () => {
         const appRoot = appFrame.contentDocument?.documentElement;
         appRoot?.style.setProperty("--safe-area-top", "59px");
