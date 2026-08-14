@@ -143,6 +143,9 @@ const state = {
   profileEditing: false
 };
 
+let recentFeedLayoutFrame = 0;
+let recentFeedResizeObserver = null;
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
@@ -1263,12 +1266,6 @@ function searchFilteredFoods() {
   });
 }
 
-function librarySummaryText() {
-  const foods = searchFilteredFoods();
-  const buyCount = foods.filter((food) => food.status.key === "repurchase").length;
-  return `共 ${foods.length} 款 · ${buyCount} 款放心买`;
-}
-
 function libraryBrowserHtml() {
   const foods = searchFilteredFoods();
   const groups = rules.groupForShopping(foods);
@@ -1361,12 +1358,7 @@ function libraryBrowserHtml() {
 }
 
 function refreshLibraryBrowser() {
-  const summary = document.querySelector("[data-library-summary]");
   const browser = document.querySelector("[data-library-browser]");
-
-  if (summary) {
-    summary.textContent = librarySummaryText();
-  }
 
   if (browser) {
     browser.innerHTML = libraryBrowserHtml();
@@ -1377,8 +1369,6 @@ function refreshLibraryBrowser() {
 
 function library() {
   const catProfile = readCatProfile();
-  const foods = listFoods();
-  const buyCount = foods.filter((food) => food.status.key === "repurchase").length;
   const avatar = catProfile.photoPath || DEFAULT_CAT_AVATAR;
   return `
     <main class="screen library-screen">
@@ -1402,16 +1392,11 @@ function library() {
           </div>
         </div>
 
-        <div class="library-profile-stats" aria-label="猫咪试吃概览">
-          <span><strong>${foods.length}</strong> 款吃过</span>
-          <span><strong>${buyCount}</strong> 款放心买</span>
-        </div>
       </section>
 
       <section class="library-sheet">
         <header class="library-sheet-heading">
           <h1>补货清单</h1>
-          <p class="library-summary" data-library-summary>${librarySummaryText()}</p>
         </header>
 
         <section class="search-tools">
@@ -1716,10 +1701,79 @@ function bindImageFallback(root = document) {
         element.src = ICONS.cat;
         element.classList.add("cat-fallback-image");
         element.alt = "猫猫头占位图";
+        scheduleRecentFeedLayout();
       },
       { once: true }
     );
   });
+}
+
+function layoutRecentFoodGrid(grid = document.querySelector(".recent-food-grid")) {
+  if (!grid?.isConnected) return;
+
+  const cards = Array.from(grid.querySelectorAll(".recent-food-card"));
+  if (!cards.length) return;
+
+  grid.classList.remove("is-masonry");
+  grid.style.removeProperty("height");
+  cards.forEach((card) => {
+    card.style.removeProperty("width");
+    card.style.removeProperty("--recent-card-x");
+    card.style.removeProperty("--recent-card-y");
+  });
+
+  const gridWidth = grid.clientWidth;
+  if (!gridWidth) return;
+
+  const styles = getComputedStyle(grid);
+  const measuredGap = Number.parseFloat(styles.columnGap);
+  const gap = Number.isFinite(measuredGap) ? measuredGap : 9;
+  const columnWidth = (gridWidth - gap) / 2;
+  const columnHeights = [0, 0];
+
+  cards.forEach((card, index) => {
+    const column = index % 2;
+    card.style.width = `${columnWidth}px`;
+    card.style.setProperty("--recent-card-x", `${column * (columnWidth + gap)}px`);
+    card.style.setProperty("--recent-card-y", `${columnHeights[column]}px`);
+    columnHeights[column] += card.getBoundingClientRect().height + gap;
+  });
+
+  grid.style.height = `${Math.max(...columnHeights) - gap}px`;
+  grid.classList.add("is-masonry");
+}
+
+function scheduleRecentFeedLayout() {
+  window.cancelAnimationFrame(recentFeedLayoutFrame);
+  recentFeedLayoutFrame = window.requestAnimationFrame(() => {
+    recentFeedLayoutFrame = 0;
+    layoutRecentFoodGrid();
+  });
+}
+
+function bindRecentFeedLayout(root = document) {
+  recentFeedResizeObserver?.disconnect();
+  recentFeedResizeObserver = null;
+
+  const grid = root.querySelector(".recent-food-grid");
+  if (!grid) return;
+
+  grid.querySelectorAll("img").forEach((element) => {
+    if (!element.complete) {
+      element.addEventListener("load", scheduleRecentFeedLayout, { once: true });
+    }
+  });
+
+  if ("ResizeObserver" in window) {
+    recentFeedResizeObserver = new ResizeObserver(scheduleRecentFeedLayout);
+    recentFeedResizeObserver.observe(grid.parentElement || grid);
+    grid.querySelectorAll(".recent-food-card").forEach((card) => {
+      recentFeedResizeObserver.observe(card);
+    });
+  }
+
+  document.fonts?.ready.then(scheduleRecentFeedLayout);
+  scheduleRecentFeedLayout();
 }
 
 function closeAutocompleteField(field) {
@@ -2002,6 +2056,7 @@ function bindTextureSelect() {
 
 function bindEvents() {
   bindImageFallback();
+  bindRecentFeedLayout();
   bindAutocomplete();
   bindDuplicateFoodCheck();
   bindTextureSelect();
@@ -2286,6 +2341,8 @@ function bindEvents() {
     nextTab.click();
   });
 }
+
+window.addEventListener("resize", scheduleRecentFeedLayout);
 
 function render() {
   const views = {

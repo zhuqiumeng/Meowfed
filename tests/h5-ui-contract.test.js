@@ -59,11 +59,11 @@ test("首页问候读取用户设置的猫猫昵称", () => {
   assert.match(source, /return nickname \|\| "噜噜"/);
   assert.match(
     styles,
-    /\.home-greeting\s*\{[\s\S]*margin: 32px 0 16px;[\s\S]*color: #1a1a1a;[\s\S]*font-size: 28px;[\s\S]*font-weight: 500/
+    /\.home-greeting\s*\{[\s\S]*margin: 32px 0 16px;[\s\S]*color: #1a1a1a;[\s\S]*font-size: var\(--type-page-size\);[\s\S]*font-weight: var\(--type-weight-medium\)/
   );
 });
 
-test("最近记录按时间顺序使用单一 DOM 的双列九像素信息流", () => {
+test("最近记录保持读屏顺序并使用两列独立堆叠的九像素信息流", () => {
   assert.match(source, /class="recent-food-grid"/);
   assert.match(source, /\$\{foods\.map\(recentFoodCard\)\.join\(""\)\}/);
   assert.doesNotMatch(source, /leftColumn|rightColumn|recent-food-column/);
@@ -74,6 +74,11 @@ test("最近记录按时间顺序使用单一 DOM 的双列九像素信息流", 
     styles,
     /\.recent-food-grid\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[\s\S]*gap: 9px/
   );
+  assert.match(source, /function layoutRecentFoodGrid\([\s\S]*const column = index % 2;[\s\S]*columnHeights\[column\] \+= card\.getBoundingClientRect\(\)\.height \+ gap/);
+  assert.match(source, /grid\.style\.height = `\$\{Math\.max\(\.\.\.columnHeights\) - gap\}px`/);
+  assert.match(source, /new ResizeObserver\(scheduleRecentFeedLayout\)/);
+  assert.match(styles, /\.recent-food-grid\.is-masonry\s*\{[\s\S]*position: relative;[\s\S]*display: block/);
+  assert.match(styles, /\.recent-food-grid\.is-masonry \.recent-food-card\s*\{[\s\S]*position: absolute;[\s\S]*translate3d\(var\(--recent-card-x\), var\(--recent-card-y\), 0\)/);
 });
 
 test("首页食品卡遵循图片、标题、相关点、反馈和日期规格", () => {
@@ -101,16 +106,16 @@ test("首页食品卡遵循图片、标题、相关点、反馈和日期规格",
   );
   assert.match(
     styles,
-    /\.home-screen \.recent-card-title\s*\{[\s\S]*font-size: 14px;[\s\S]*font-weight: 500;[\s\S]*-webkit-line-clamp: 2/
+    /\.home-screen \.recent-card-title\s*\{[\s\S]*font-size: var\(--type-body-size\);[\s\S]*font-weight: var\(--type-weight-medium\);[\s\S]*-webkit-line-clamp: 2/
   );
   assert.match(
     styles,
-    /\.home-screen \.recent-card-meta\s*\{[\s\S]*margin: 0 0 9px;[\s\S]*color: #808080;[\s\S]*font-size: 11px/
+    /\.home-screen \.recent-card-meta\s*\{[\s\S]*margin: 0 0 9px;[\s\S]*color: #808080;[\s\S]*font-size: var\(--type-label-size\)/
   );
   assert.match(styles, /\.home-screen \.recent-card-type\s*\{[\s\S]*color: #0088df/);
   assert.match(
     styles,
-    /\.home-screen \.recent-feedback-tag\s*\{[\s\S]*height: var\(--tag-height\);[\s\S]*padding: 0 7px;[\s\S]*border-radius: var\(--tag-radius\);[\s\S]*font-size: 11px;[\s\S]*font-weight: 600/
+    /\.home-screen \.recent-feedback-tag\s*\{[\s\S]*height: var\(--tag-height\);[\s\S]*padding: 0 7px;[\s\S]*border-radius: var\(--tag-radius\);[\s\S]*font-size: var\(--type-label-size\);[\s\S]*font-weight: var\(--type-weight-semibold\)/
   );
   assert.match(source, /class="recent-feedback-tag status-tag feedback-/);
   assert.match(styles, /\.home-screen \.feedback-eager,[\s\S]*\.home-screen \.feedback-okay/);
@@ -118,7 +123,7 @@ test("首页食品卡遵循图片、标题、相关点、反馈和日期规格",
   assert.match(styles, /\.home-screen \.feedback-bury/);
   assert.match(
     styles,
-    /\.home-screen \.recent-card-time\s*\{[\s\S]*color: #4d4d4d;[\s\S]*font-size: 12px/
+    /\.home-screen \.recent-card-time\s*\{[\s\S]*color: #4d4d4d;[\s\S]*font-size: var\(--type-meta-size\)/
   );
 });
 
@@ -131,7 +136,11 @@ test("H5 以 390×844 为设计基准并自适应宽高和安全区", () => {
   assert.match(styles, /@media \(orientation: portrait\) and \(max-height: 620px\)/);
   assert.match(styles, /@media \(orientation: landscape\) and \(max-height: 500px\)/);
   assert.match(indexHtml, /apple-mobile-web-app-capable" content="yes"/);
+  assert.match(indexHtml, /mobile-web-app-capable" content="yes"/);
   assert.match(indexHtml, /apple-mobile-web-app-status-bar-style" content="black-translucent"/);
+  assert.match(indexHtml, /<html lang="zh-CN" data-screen="home">/);
+  assert.match(indexHtml, /document\.documentElement\.dataset\.screen = screen/);
+  assert.match(indexHtml, /html\[data-screen="library"\][\s\S]*linear-gradient\(128deg, #edf8ff/);
   assert.match(styles, /#app\s*\{[\s\S]*background-origin: border-box;[\s\S]*background-position: 0 0/);
   assert.match(styles, /\.screen:not\(\.library-screen\)\s*\{[\s\S]*background-origin: border-box;[\s\S]*background-position: 0 0/);
   assert.match(styles, /\.library-cat-profile\s*\{[\s\S]*background-origin: border-box;[\s\S]*background-position: 0 0/);
@@ -145,6 +154,7 @@ test("真机状态栏跟随当前页面顶部背景而不是外层灰色画布",
   assert.match(styles, /html\[data-screen="home"\],[\s\S]*body\[data-screen="home"\][\s\S]*--page-chrome-background:/);
   assert.match(styles, /html\[data-screen="library"\],[\s\S]*body\[data-screen="library"\][\s\S]*linear-gradient\(128deg, #edf8ff/);
   assert.match(styles, /html\[data-screen="add"\],[\s\S]*body\[data-screen="detail"\][\s\S]*--page-chrome-background: #ffffff/);
+  assert.match(styles, /body::before\s*\{[\s\S]*height: var\(--safe-area-top\);[\s\S]*background: var\(--page-chrome-background/);
   assert.match(styles, /\.fixed-page-shell\s*\{[\s\S]*background: #ffffff/);
   assert.doesNotMatch(styles, /html\s*\{[\s\S]*background: #f2f3f7/);
   assert.doesNotMatch(styles, /body\s*\{[\s\S]*background: #f2f3f7/);
@@ -167,7 +177,7 @@ test("反馈支持最多 120 字可选备注并写入结果", () => {
   assert.match(source, /data-feedback-note[\s\S]*maxlength="120"[\s\S]*placeholder="例如：加了冻干才愿意吃"/);
   assert.match(source, /note: state\.feedbackNote\.trim\(\)/);
   assert.match(source, /state\.feedbackNote = event\.currentTarget\.value\.slice\(0, 120\)/);
-  assert.match(styles, /\.feedback-note-field textarea\s*\{[\s\S]*min-height: 72px;[\s\S]*font-size: 16px/);
+  assert.match(styles, /\.feedback-note-field textarea\s*\{[\s\S]*min-height: 72px;[\s\S]*font-size: var\(--type-control-size\)/);
 });
 
 test("清单状态 Tab 只接受横向触摸手势", () => {
@@ -192,6 +202,8 @@ test("iPhone 15 Pro 样机使用 393×852 内容视口并按窗口等比缩放",
   assert.match(iphonePreview, /title="猫吃了吗手机预览"/);
   assert.match(iphonePreview, /function fitDevice\(\)/);
   assert.match(iphonePreview, /appFrame\.src = `\.\.\/\?screen=/);
+  assert.match(iphonePreview, /const previewVersion = "29"/);
+  assert.match(iphonePreview, /&preview=\$\{previewVersion\}/);
   assert.match(iphonePreview, /--safe-area-top", "59px"/);
   assert.match(iphonePreview, /--safe-area-bottom", "34px"/);
 });
@@ -218,7 +230,7 @@ test("补货清单使用状态 Tab 和按需出现的线框类型胶囊", () => 
   assert.match(styles, /\.library-type-chip\s*\{[\s\S]*min-height: 44px/);
   assert.match(
     styles,
-    /\.library-type-chip-label\s*\{[\s\S]*min-height: 32px;[\s\S]*padding: 0 10px;[\s\S]*border-radius: var\(--filter-radius\);[\s\S]*font-size: 13px;[\s\S]*line-height: 18px/
+    /\.library-type-chip-label\s*\{[\s\S]*min-height: 32px;[\s\S]*padding: 0 10px;[\s\S]*border-radius: var\(--filter-radius\);[\s\S]*font-size: var\(--type-body-size\);[\s\S]*line-height: 18px/
   );
   assert.match(
     styles,
@@ -257,20 +269,50 @@ test("补货清单顶部展示单猫头像并用底部抽屉编辑昵称，商�
   assert.match(source, /productThumbnail: true/);
   assert.match(source, /uiIcon\(iconName, "product-fallback", label\)/);
   assert.match(source, /phosphor-cylinder-light\.svg/);
-  assert.match(styles, /\.library-cat-profile\s*\{[\s\S]*min-height: 380px;[\s\S]*linear-gradient\(128deg, #edf8ff/);
+  assert.match(styles, /\.library-cat-profile\s*\{[\s\S]*min-height: 266px;[\s\S]*linear-gradient\(128deg, #edf8ff/);
   assert.match(styles, /\.library-cat-profile::before,[\s\S]*filter: blur\(46px\)/);
-  assert.match(styles, /\.library-cat-avatar\s*\{[\s\S]*width: 112px;[\s\S]*border-radius: 50%/);
-  assert.match(styles, /\.library-profile-stats\s*\{[\s\S]*backdrop-filter: blur\(18px\) saturate\(150%\)/);
+  assert.match(styles, /\.library-cat-avatar\s*\{[\s\S]*width: 96px;[\s\S]*border-radius: 50%/);
+  assert.doesNotMatch(source, /library-profile-stats|library-summary|librarySummaryText|猫咪试吃概览|款吃过|款放心买/);
   assert.match(styles, /\.profile-name-backdrop\s*\{[\s\S]*padding: 0/);
   assert.match(styles, /\.modal-sheet\.profile-name-sheet\s*\{[\s\S]*width: 100%;[\s\S]*padding: 10px 24px calc\(9px \+ var\(--safe-area-bottom\)\);[\s\S]*border-radius: 24px 24px 0 0;[\s\S]*background: #ffffff/);
-  assert.match(styles, /\.profile-name-sheet-form input\s*\{[\s\S]*min-height: 48px;[\s\S]*font-size: 16px/);
+  assert.match(styles, /\.profile-name-sheet-form input\s*\{[\s\S]*min-height: 48px;[\s\S]*font-size: var\(--type-control-size\)/);
   assert.match(styles, /\.profile-name-sheet-head\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: 44px minmax\(0, 1fr\) 44px/);
   assert.match(styles, /\.profile-name-sheet-head h2\s*\{[\s\S]*grid-column: 2;[\s\S]*text-align: center/);
   assert.match(styles, /\.profile-name-sheet-head \.modal-close-button\s*\{[\s\S]*background: transparent/);
-  assert.match(styles, /\.library-sheet\s*\{[\s\S]*margin-top: -30px;[\s\S]*border-radius: 30px 30px 0 0;[\s\S]*backdrop-filter: blur\(28px\) saturate\(145%\)/);
+  assert.match(styles, /\.library-sheet\s*\{[\s\S]*margin-top: -24px;[\s\S]*border-radius: 30px 30px 0 0;[\s\S]*backdrop-filter: blur\(28px\) saturate\(145%\)/);
   assert.match(styles, /\.product-thumb-staple_can,[\s\S]*\.product-thumb-snack_can/);
   assert.match(styles, /\.icon-can\s*\{[\s\S]*phosphor-cylinder-light\.svg/);
   assert.match(styles, /\.food-row\s*\{[\s\S]*min-width: 0;[\s\S]*max-width: 100%/);
+});
+
+test("全应用使用 14px Regular 正文和收敛的字体层级", () => {
+  assert.match(styles, /--type-body-size: 14px/);
+  assert.match(styles, /--type-weight-regular: 400/);
+  assert.match(styles, /body\s*\{[\s\S]*font-size: var\(--type-body-size\);[\s\S]*font-weight: var\(--type-weight-regular\)/);
+  assert.match(styles, /--type-label-size: 11px/);
+  assert.match(styles, /--type-meta-size: 12px/);
+  assert.match(styles, /--type-control-size: 16px/);
+  assert.match(styles, /--type-section-size: 18px/);
+  assert.match(styles, /--type-detail-size: 22px/);
+  assert.match(styles, /--type-page-size: 28px/);
+  const allowedSizes = new Set([
+    "var(--type-label-size)",
+    "var(--type-meta-size)",
+    "var(--type-body-size)",
+    "var(--type-control-size)",
+    "var(--type-section-size)",
+    "var(--type-detail-size)",
+    "var(--type-page-size)"
+  ]);
+  const allowedWeights = new Set([
+    "var(--type-weight-regular)",
+    "var(--type-weight-medium)",
+    "var(--type-weight-semibold)"
+  ]);
+  const fontSizes = [...styles.matchAll(/font-size:\s*([^;]+);/g)].map((match) => match[1].trim());
+  const fontWeights = [...styles.matchAll(/font-weight:\s*([^;]+);/g)].map((match) => match[1].trim());
+  assert.ok(fontSizes.every((value) => allowedSizes.has(value)), `存在未归一的字号：${fontSizes.filter((value) => !allowedSizes.has(value)).join(", ")}`);
+  assert.ok(fontWeights.every((value) => allowedWeights.has(value)), `存在未归一的字重：${fontWeights.filter((value) => !allowedWeights.has(value)).join(", ")}`);
 });
 
 test("添加和编辑食物支持系统照片选择器而非强制打开相机", () => {
@@ -283,7 +325,7 @@ test("补货清单使用轻量搜索、清晰状态 Tab 和图标关闭按钮", 
   assert.match(source, /placeholder="搜品牌、口味或质地"/);
   assert.match(source, /class="icon-button modal-close-button"[\s\S]*aria-label="关闭"/);
   assert.doesNotMatch(source, />关闭<\/button>/);
-  assert.match(styles, /\.library-sheet \.search-input\s*\{[\s\S]*font-size: 16px/);
+  assert.match(styles, /\.library-sheet \.search-input\s*\{[\s\S]*font-size: var\(--type-control-size\)/);
   assert.match(styles, /\.library-tab\.active::after\s*\{[\s\S]*background: currentColor/);
   assert.match(styles, /\.modal-close-button\s*\{[\s\S]*width: 44px;[\s\S]*height: 44px/);
   assert.match(source, /data-library-search[\s\S]*data-mobile-keyboard[\s\S]*inputmode="search"/);
@@ -305,6 +347,8 @@ test("手机安全区、吸顶栏和文字输入使用机型自适应约束", ()
   assert.match(source, /class="fixed-page-shell feedback-page-shell"[\s\S]*class="screen no-tab fixed-page-scroll feedback-screen"/);
   assert.match(source, /class="fixed-page-shell detail-page-shell"[\s\S]*class="screen no-tab fixed-page-scroll detail-screen"/);
   assert.match(styles, /\.screen\.no-tab\.fixed-page-scroll\s*\{[\s\S]*padding-top: calc\([\s\S]*var\(--safe-area-top\)[\s\S]*var\(--fixed-topbar-content-height\)/);
+  assert.match(styles, /body\[data-screen="add"\],[\s\S]*body\[data-screen="detail"\][\s\S]*position: fixed;[\s\S]*inset: 0/);
+  assert.match(styles, /\.fixed-page-shell\s*\{[\s\S]*position: fixed;[\s\S]*inset: 0;[\s\S]*width: min\(100%, var\(--app-max-width\)\);[\s\S]*overflow: hidden/);
   assert.match(styles, /\.fixed-page-shell > \.fixed-page-scroll\s*\{[\s\S]*height: 100%;[\s\S]*overflow-y: auto;[\s\S]*overscroll-behavior-y: none/);
   assert.match(styles, /\.fixed-page-shell > \.topbar\s*\{[\s\S]*position: absolute;[\s\S]*top: 0;[\s\S]*height: calc\(var\(--fixed-topbar-content-height\) \+ var\(--safe-area-top\)\);[\s\S]*padding: var\(--safe-area-top\)/);
   assert.doesNotMatch(source, /const history = \(food\.results/);
@@ -407,7 +451,7 @@ test("底部导航使用统一线描图标、全局记录动作和独立安全�
   );
   assert.match(
     styles,
-    /\/\* Bottom navigation · 390 × 48 reference plus the device safe area\.[\s\S]*\.nav-item,[\s\S]*color: #4d4d4d;[\s\S]*font-size: 11px;[\s\S]*line-height: 14px/
+    /\/\* Bottom navigation · 390 × 48 reference plus the device safe area\.[\s\S]*\.nav-item,[\s\S]*color: #4d4d4d;[\s\S]*font-size: var\(--type-label-size\);[\s\S]*line-height: 14px/
   );
   assert.match(
     styles,
