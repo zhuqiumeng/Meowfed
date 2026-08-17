@@ -24,7 +24,7 @@ const FOOD_TYPES = {
   other: "其他"
 };
 
-const TEXTURE_OPTIONS = ["肉泥 / 慕斯", "肉块", "肉丝", "冻干块", "其他"];
+const TEXTURE_OPTIONS = ["肉泥/慕斯", "肉块", "肉丝", "冻干", "其他"];
 
 const FOOD_TYPE_ORDER = [
   "staple_can",
@@ -742,22 +742,6 @@ function home() {
           <span>这次吃的怎么样？</span>
         </h1>
 
-        ${
-          foods.length
-            ? `
-              <button
-                class="home-record-action"
-                type="button"
-                data-open-picker
-                data-record-trigger="home-greeting"
-              >
-                <span class="home-record-action-icon">${uiIcon("clock")}</span>
-                <span><strong>记录已有食物</strong><small>选刚刚喂的，几秒记完</small></span>
-              </button>
-            `
-            : ""
-        }
-
         <section class="home-recent" aria-labelledby="recent-records-title">
           <h2 class="home-recent-heading" id="recent-records-title">最近记录</h2>
           ${
@@ -981,48 +965,84 @@ function profileNameSheet(catProfile) {
   `;
 }
 
-function textureField(value) {
-  const selected = TEXTURE_OPTIONS.includes(value) ? value : TEXTURE_OPTIONS[0];
+function normalizeTextureSelection(value) {
+  const current = String(value || "").trim();
+  if (TEXTURE_OPTIONS.includes(current)) return current;
+  if (/肉泥|慕斯/.test(current)) return "肉泥/慕斯";
+  if (/冻干/.test(current)) return "冻干";
+  return "";
+}
+
+function choiceField(name, label, selectedValue, options, placeholder = "请选择") {
+  const fieldId = `food-${name}-label`;
+  const valueId = `food-${name}-value-label`;
+  const selectedLabel = options.find(([value]) => value === selectedValue)?.[1] || "";
 
   return `
-    <div class="field-row custom-select-field" data-texture-select>
-      <span id="food-texture-label" class="field-label-text">质地</span>
-      <input type="hidden" name="texture" value="${escapeHtml(selected)}" data-texture-value />
+    <div class="field-row choice-field" data-choice-field="${escapeHtml(name)}">
+      <span id="${fieldId}" class="field-label-text">${escapeHtml(label)}</span>
+      <input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(selectedValue)}" data-choice-value="${escapeHtml(name)}" />
       <button
-        class="custom-select-trigger"
+        class="choice-field-trigger"
         type="button"
-        data-texture-trigger
-        aria-labelledby="food-texture-label food-texture-value"
-        aria-haspopup="listbox"
+        data-choice-trigger="${escapeHtml(name)}"
+        aria-labelledby="${fieldId} ${valueId}"
+        aria-haspopup="dialog"
+        aria-controls="food-${escapeHtml(name)}-sheet"
         aria-expanded="false"
       >
-        <span id="food-texture-value" class="custom-select-value">${escapeHtml(selected)}</span>
-        <span class="custom-select-chevron" aria-hidden="true"></span>
+        <span id="${valueId}" class="choice-field-value ${selectedLabel ? "" : "is-placeholder"}">${escapeHtml(selectedLabel || placeholder)}</span>
+        <img class="choice-field-chevron" src="./assets/icons/figma-add-chevron-right.svg" alt="" aria-hidden="true" />
       </button>
-      <div
-        class="custom-select-menu"
-        data-texture-menu
-        role="listbox"
-        aria-labelledby="food-texture-label"
-        hidden
+    </div>
+  `;
+}
+
+function choiceSheet(name, title, selectedValue, options) {
+  return `
+    <div class="choice-sheet-layer" data-choice-sheet="${escapeHtml(name)}" hidden>
+      <button class="choice-sheet-scrim" type="button" data-choice-close="${escapeHtml(name)}" aria-label="关闭${escapeHtml(title)}选择"></button>
+      <section
+        class="choice-sheet-panel"
+        id="food-${escapeHtml(name)}-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="food-${escapeHtml(name)}-sheet-title"
+        style="--choice-sheet-height: ${92 + options.length * 56}px"
+        tabindex="-1"
       >
-        ${TEXTURE_OPTIONS
-          .map(
-            (option) => `
-              <button
-                class="custom-select-option ${option === selected ? "selected" : ""}"
-                type="button"
-                role="option"
-                aria-selected="${option === selected}"
-                data-texture-option="${escapeHtml(option)}"
-              >
-                <span>${escapeHtml(option)}</span>
-                <span class="custom-select-option-mark" aria-hidden="true">${option === selected ? "✓" : ""}</span>
-              </button>
-            `
-          )
-          .join("")}
-      </div>
+        <header class="choice-sheet-head">
+          <h2 id="food-${escapeHtml(name)}-sheet-title">${escapeHtml(title)}</h2>
+          <button class="choice-sheet-close" type="button" data-choice-close="${escapeHtml(name)}" aria-label="关闭${escapeHtml(title)}选择">
+            <img src="./assets/icons/figma-sheet-close.svg" alt="" aria-hidden="true" />
+          </button>
+        </header>
+        <div class="choice-sheet-options" role="radiogroup" aria-labelledby="food-${escapeHtml(name)}-sheet-title">
+          ${options
+            .map(([value, optionLabel]) => {
+              const selected = value === selectedValue;
+              return `
+                <button
+                  class="choice-sheet-option ${selected ? "selected" : ""}"
+                  type="button"
+                  role="radio"
+                  aria-checked="${selected}"
+                  data-choice-option="${escapeHtml(name)}"
+                  data-choice-option-value="${escapeHtml(value)}"
+                >
+                  <span>${escapeHtml(optionLabel)}</span>
+                  <img
+                    class="choice-sheet-radio"
+                    src="./assets/icons/${selected ? "figma-radio-checked.svg" : "figma-radio-default.svg"}"
+                    alt=""
+                    aria-hidden="true"
+                  />
+                </button>
+              `;
+            })
+            .join("")}
+        </div>
+      </section>
     </div>
   `;
 }
@@ -1030,57 +1050,48 @@ function textureField(value) {
 function addFoodView() {
   const editing = state.selectedFoodId ? findFood(state.selectedFoodId) : null;
   const type = editing?.foodType || "staple_can";
+  const texture = normalizeTextureSelection(editing?.texture);
   const photo = state.photoDataUrl || editing?.photoPath || "";
+  const typeOptions = Object.entries(FOOD_TYPES);
+  const textureOptions = TEXTURE_OPTIONS.map((option) => [option, option]);
 
   return `
     <section class="fixed-page-shell add-page-shell">
       ${topbar(editing ? "编辑食物" : "加食物")}
       <main class="screen no-tab fixed-page-scroll add-screen">
 
-      <aside class="page-intro-tip" role="note">赶时间？只拍张包装照就能存，下次再补其他字段。</aside>
+      <aside class="page-intro-tip" role="note">赶时间？可以只先拍包装，有空再补详情～</aside>
 
       <form id="food-form" data-editing-id="${editing?.id || ""}">
-        <label class="photo-upload">
-          <input id="photo-input" type="file" accept="image/*" />
-          ${
-            photo
-              ? image(photo, "photo-preview", "包装预览")
-              : `${uiIcon("camera", "photo-upload-icon")}<strong>拍包装或选照片</strong><small>再次记录不用重复拍</small>`
-          }
-        </label>
-
-        <fieldset class="field-group">
-          <legend>食物类型</legend>
-          <div class="type-options">
-            ${Object.entries(FOOD_TYPES)
-              .map(
-                ([value, label]) => `
-                  <label class="type-option">
-                    <input type="radio" name="foodType" value="${value}" ${value === type ? "checked" : ""} />
-                    <span class="filter-chip-label">${label}</span>
-                  </label>
-                `
-              )
-              .join("")}
-          </div>
-        </fieldset>
+        <section class="add-photo-card">
+          <span class="add-photo-label"><span aria-hidden="true">*</span>包装图</span>
+          <label class="photo-upload" aria-label="拍包装或选择照片">
+            <input id="photo-input" type="file" accept="image/*" />
+            ${
+              photo
+                ? image(photo, "photo-preview", "包装预览")
+                : '<img class="add-photo-plus" src="./assets/icons/figma-add-plus.svg" alt="" aria-hidden="true" />'
+            }
+          </label>
+        </section>
 
         <section class="form-card">
-          ${autocompleteField("brand", "品牌", editing?.brand, "例如 Catz Finefood")}
-          ${autocompleteField("name", "产品名", editing?.name, "例如 GrandaPet 菲力系列纯鸡肉 85g")}
+          ${choiceField("foodType", "类型", type, typeOptions)}
+          ${autocompleteField("brand", "品牌", editing?.brand, "请输入")}
+          ${autocompleteField("name", "产品名", editing?.name, "请输入")}
           <label class="field-row">
             <span class="field-label-text">规格</span>
             <input
               name="specification"
               value="${escapeHtml(editing?.specification || "")}"
-              placeholder="例如 85g"
+              placeholder="请输入"
               inputmode="text"
               enterkeyhint="next"
               data-mobile-keyboard
             />
           </label>
-          ${autocompleteField("flavor", "口味 / 肉源", editing?.flavor, "例如 鸡肉、火鸡")}
-          ${textureField(editing?.texture)}
+          ${autocompleteField("flavor", "肉源/口味", editing?.flavor, "请输入")}
+          ${choiceField("texture", "质地", texture, textureOptions)}
         </section>
 
         <section class="duplicate-food-notice" data-duplicate-food-notice role="status" aria-live="polite" hidden></section>
@@ -1088,8 +1099,10 @@ function addFoodView() {
         </form>
       </main>
       <footer class="fixed-bottom-action add-bottom-action">
-        <button class="primary-button fixed-bottom-action-button add-submit-button" type="submit" form="food-form">${editing ? "保存" : "添加"}</button>
+        <button class="primary-button fixed-bottom-action-button add-submit-button" type="submit" form="food-form">保存</button>
       </footer>
+      ${choiceSheet("foodType", "类型", type, typeOptions)}
+      ${choiceSheet("texture", "质地", texture, textureOptions)}
     </section>
   `;
 }
@@ -1915,143 +1928,159 @@ function bindAutocomplete() {
   });
 }
 
-function textureSelectParts() {
-  const field = document.querySelector("[data-texture-select]");
+function choiceSheetParts(name) {
+  const field = document.querySelector(`[data-choice-field="${name}"]`);
+  const layer = document.querySelector(`[data-choice-sheet="${name}"]`);
   return {
     field,
-    trigger: field?.querySelector("[data-texture-trigger]"),
-    menu: field?.querySelector("[data-texture-menu]"),
-    value: field?.querySelector("[data-texture-value]"),
-    label: field?.querySelector("#food-texture-value")
+    layer,
+    trigger: field?.querySelector(`[data-choice-trigger="${name}"]`),
+    value: field?.querySelector(`[data-choice-value="${name}"]`),
+    label: field?.querySelector(".choice-field-value"),
+    panel: layer?.querySelector(".choice-sheet-panel")
   };
 }
 
-function closeTextureSelect(focusTrigger = false) {
-  const { field, trigger, menu } = textureSelectParts();
-  if (!field || !trigger || !menu) return;
+function closeChoiceSheet(name, focusTrigger = false) {
+  const { layer, trigger } = choiceSheetParts(name);
+  if (!layer || !trigger) return;
 
-  field.classList.remove("is-open");
-  field.classList.remove("opens-up");
+  layer.hidden = true;
   trigger.setAttribute("aria-expanded", "false");
-  menu.hidden = true;
+  if (!document.querySelector("[data-choice-sheet]:not([hidden])")) {
+    document.body.removeAttribute("data-choice-sheet-open");
+  }
   if (focusTrigger) trigger.focus();
 }
 
-function positionTextureMenu() {
-  const { field, trigger, menu } = textureSelectParts();
-  if (!field || !trigger || !menu || !field.classList.contains("is-open")) return;
-
-  const triggerRect = trigger.getBoundingClientRect();
-  const menuHeight = menu.scrollHeight;
-  const spaceBelow = window.innerHeight - triggerRect.bottom;
-  const spaceAbove = triggerRect.top;
-  const opensUp = spaceBelow < menuHeight + 12 && spaceAbove > spaceBelow;
-  field.classList.toggle("opens-up", opensUp);
+function closeAllChoiceSheets() {
+  document.querySelectorAll("[data-choice-sheet]:not([hidden])").forEach((layer) => {
+    closeChoiceSheet(layer.dataset.choiceSheet);
+  });
 }
 
-function openTextureSelect(focusSelected = false) {
-  const { field, trigger, menu } = textureSelectParts();
-  if (!field || !trigger || !menu) return;
+function openChoiceSheet(name, focusSelected = false) {
+  closeAllChoiceSheets();
+  const { layer, trigger, panel } = choiceSheetParts(name);
+  if (!layer || !trigger || !panel) return;
 
-  field.classList.add("is-open");
+  if (!layer.querySelector('[data-choice-option][aria-checked="true"]')) {
+    const firstOption = layer.querySelector("[data-choice-option]");
+    firstOption?.classList.add("selected");
+    firstOption?.setAttribute("aria-checked", "true");
+    const radio = firstOption?.querySelector(".choice-sheet-radio");
+    if (radio) radio.src = "./assets/icons/figma-radio-checked.svg";
+  }
+
+  layer.hidden = false;
   trigger.setAttribute("aria-expanded", "true");
-  menu.hidden = false;
-  positionTextureMenu();
-
+  document.body.dataset.choiceSheetOpen = name;
   if (focusSelected) {
-    menu.querySelector('[data-texture-option][aria-selected="true"]')?.focus();
+    layer.querySelector('[data-choice-option][aria-checked="true"]')?.focus();
+  } else {
+    panel.focus({ preventScroll: true });
   }
 }
 
-function chooseTextureOption(option) {
-  const { field, trigger, menu, value, label } = textureSelectParts();
-  const nextValue = option?.dataset.textureOption;
-  if (!field || !trigger || !menu || !value || !label || !nextValue) return;
+function syncChoiceField(name) {
+  const { layer, value, label } = choiceSheetParts(name);
+  if (!layer || !value || !label) return;
 
-  value.value = nextValue;
-  label.textContent = nextValue;
-  menu.querySelectorAll("[data-texture-option]").forEach((item) => {
-    const selected = item === option;
-    item.classList.toggle("selected", selected);
-    item.setAttribute("aria-selected", String(selected));
-    const mark = item.querySelector(".custom-select-option-mark");
-    if (mark) mark.textContent = selected ? "✓" : "";
+  const selectedOption = layer.querySelector(
+    `[data-choice-option="${name}"][data-choice-option-value="${CSS.escape(value.value)}"]`
+  );
+  const nextLabel = selectedOption?.querySelector("span")?.textContent || "";
+  label.textContent = nextLabel || "请选择";
+  label.classList.toggle("is-placeholder", !nextLabel);
+
+  layer.querySelectorAll(`[data-choice-option="${name}"]`).forEach((option) => {
+    const selected = option === selectedOption;
+    option.classList.toggle("selected", selected);
+    option.setAttribute("aria-checked", String(selected));
+    const radio = option.querySelector(".choice-sheet-radio");
+    if (radio) {
+      radio.src = `./assets/icons/${selected ? "figma-radio-checked.svg" : "figma-radio-default.svg"}`;
+    }
   });
-  closeTextureSelect(true);
 }
 
-function bindTextureSelect() {
-  if (app.dataset.textureSelectBound === "true") return;
-  app.dataset.textureSelectBound = "true";
+function chooseChoiceOption(option) {
+  const name = option?.dataset.choiceOption;
+  const nextValue = option?.dataset.choiceOptionValue;
+  const { value } = choiceSheetParts(name);
+  if (!name || !nextValue || !value) return;
+
+  value.value = nextValue;
+  syncChoiceField(name);
+  value.dispatchEvent(new Event("change", { bubbles: true }));
+  closeChoiceSheet(name, true);
+}
+
+function bindChoiceSheets() {
+  if (app.dataset.choiceSheetsBound === "true") return;
+  app.dataset.choiceSheetsBound = "true";
 
   app.addEventListener("click", (event) => {
-    const trigger = event.target.closest?.("[data-texture-trigger]");
+    const trigger = event.target.closest?.("[data-choice-trigger]");
     if (trigger) {
-      const { field } = textureSelectParts();
-      if (field?.classList.contains("is-open")) {
-        closeTextureSelect();
-      } else {
-        openTextureSelect();
-      }
+      openChoiceSheet(trigger.dataset.choiceTrigger);
       return;
     }
 
-    const option = event.target.closest?.("[data-texture-option]");
+    const option = event.target.closest?.("[data-choice-option]");
     if (option) {
       event.preventDefault();
-      chooseTextureOption(option);
+      chooseChoiceOption(option);
       return;
     }
 
-    if (!event.target.closest?.("[data-texture-select]")) {
-      closeTextureSelect();
+    const close = event.target.closest?.("[data-choice-close]");
+    if (close) {
+      closeChoiceSheet(close.dataset.choiceClose, true);
     }
   });
 
   app.addEventListener("keydown", (event) => {
-    const trigger = event.target.closest?.("[data-texture-trigger]");
-    if (trigger) {
-      if (["ArrowDown", "Enter", " "].includes(event.key)) {
-        event.preventDefault();
-        openTextureSelect(true);
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        closeTextureSelect();
-      }
+    const trigger = event.target.closest?.("[data-choice-trigger]");
+    if (trigger && ["ArrowDown", "Enter", " "].includes(event.key)) {
+      event.preventDefault();
+      openChoiceSheet(trigger.dataset.choiceTrigger, true);
       return;
     }
 
-    const option = event.target.closest?.("[data-texture-option]");
-    if (!option) return;
+    const layer = event.target.closest?.("[data-choice-sheet]");
+    if (!layer) return;
+    const name = layer.dataset.choiceSheet;
 
-    const menu = option.closest("[data-texture-menu]");
-    const options = menu
-      ? Array.from(menu.querySelectorAll("[data-texture-option]"))
-      : [];
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeChoiceSheet(name, true);
+      return;
+    }
+
+    const option = event.target.closest?.("[data-choice-option]");
+    if (option && ["Enter", " "].includes(event.key)) {
+      event.preventDefault();
+      chooseChoiceOption(option);
+      return;
+    }
+
+    if (!option || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+      return;
+    }
+
+    const options = Array.from(layer.querySelectorAll("[data-choice-option]"));
     const currentIndex = options.indexOf(option);
-
-    if (event.key === "ArrowDown" && options.length) {
-      event.preventDefault();
-      options[(currentIndex + 1) % options.length].focus();
-    } else if (event.key === "ArrowUp" && options.length) {
-      event.preventDefault();
-      options[(currentIndex - 1 + options.length) % options.length].focus();
-    } else if (event.key === "Home" && options.length) {
-      event.preventDefault();
-      options[0].focus();
-    } else if (event.key === "End" && options.length) {
-      event.preventDefault();
-      options[options.length - 1].focus();
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      closeTextureSelect(true);
-    } else if (["Enter", " "].includes(event.key)) {
-      event.preventDefault();
-      chooseTextureOption(option);
+    event.preventDefault();
+    if (event.key === "Home") {
+      options[0]?.focus();
+    } else if (event.key === "End") {
+      options.at(-1)?.focus();
+    } else {
+      const offset = event.key === "ArrowDown" ? 1 : -1;
+      options[(currentIndex + offset + options.length) % options.length]?.focus();
     }
   });
-
-  window.addEventListener("resize", positionTextureMenu);
 }
 
 function bindEvents() {
@@ -2059,7 +2088,7 @@ function bindEvents() {
   bindRecentFeedLayout();
   bindAutocomplete();
   bindDuplicateFoodCheck();
-  bindTextureSelect();
+  bindChoiceSheets();
   refreshDuplicateFoodNotice();
 
   document.querySelectorAll("[data-mobile-keyboard]").forEach((input) => {
@@ -2275,6 +2304,8 @@ function bindEvents() {
           control.value = value;
         }
       });
+      syncChoiceField("foodType");
+      syncChoiceField("texture");
     } catch (error) {
       showToast("照片没有读取成功，请重新选择");
     }
@@ -2359,6 +2390,7 @@ function render() {
   document
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute("content", PAGE_THEME_COLORS[screen] || PAGE_THEME_COLORS.home);
+  document.body.removeAttribute("data-choice-sheet-open");
   app.innerHTML = (views[screen] || home)();
   bindEvents();
 }
