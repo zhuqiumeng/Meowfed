@@ -1,8 +1,8 @@
-const CACHE_NAME = "cat-eat-h5-v29";
+const CACHE_NAME = "cat-eat-h5-v32";
 const APP_ASSETS = [
   "./?screen=home",
-  "./preview.css?v=29",
-  "./preview.js?v=29",
+  "./preview.css?v=32",
+  "./preview.js?v=32",
   "./utils/rules.js",
   "./utils/data-store.js",
   "./manifest.webmanifest",

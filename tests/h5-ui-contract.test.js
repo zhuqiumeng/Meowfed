@@ -32,7 +32,7 @@ test("首页始终提供最近记录信息流与空状态", () => {
   assert.match(source, /id="recent-records-title">最近记录<\/h2>/);
   assert.match(source, /还没有最近记录/);
   assert.match(source, /已经到底了哟/);
-  assert.match(source, /class="home-record-action"[\s\S]*data-open-picker[\s\S]*记录已有食物[\s\S]*几秒记完/);
+  assert.doesNotMatch(source, /home-record-action|data-record-trigger="home-greeting"|记录已有食物/);
   assert.match(source, /class="primary-button recent-empty-primary"[\s\S]*data-nav="add">拍下第一款/);
 });
 
@@ -177,7 +177,11 @@ test("反馈支持最多 120 字可选备注并写入结果", () => {
   assert.match(source, /data-feedback-note[\s\S]*maxlength="120"[\s\S]*placeholder="例如：加了冻干才愿意吃"/);
   assert.match(source, /note: state\.feedbackNote\.trim\(\)/);
   assert.match(source, /state\.feedbackNote = event\.currentTarget\.value\.slice\(0, 120\)/);
-  assert.match(styles, /\.feedback-note-field textarea\s*\{[\s\S]*min-height: 72px;[\s\S]*font-size: var\(--type-control-size\)/);
+  assert.match(styles, /\.feedback-note-field textarea\s*\{[\s\S]*min-height: 72px;[\s\S]*font-size: var\(--type-control-size\);[\s\S]*font-weight: var\(--type-weight-regular\)/);
+  const selectedOutcomeRules = [...styles.matchAll(/\.outcome-option\.selected\s*\{([^}]*)\}/g)].map((match) => match[1]);
+  assert.ok(selectedOutcomeRules.length > 0);
+  assert.ok(selectedOutcomeRules.every((rule) => !/inset 3px|brand-soft|lime-soft/.test(rule)));
+  assert.match(styles, /\.outcome-option\.selected\s*\{[\s\S]*border-color: var\(--line\);[\s\S]*background: rgba\(255, 255, 255, 0\.94\);[\s\S]*box-shadow: none/);
 });
 
 test("清单状态 Tab 只接受横向触摸手势", () => {
@@ -201,9 +205,11 @@ test("iPhone 15 Pro 样机使用 393×852 内容视口并按窗口等比缩放",
   assert.match(iphonePreview, /class="status-time">9:41/);
   assert.match(iphonePreview, /title="猫吃了吗手机预览"/);
   assert.match(iphonePreview, /function fitDevice\(\)/);
-  assert.match(iphonePreview, /appFrame\.src = `\.\.\/\?screen=/);
-  assert.match(iphonePreview, /const previewVersion = "29"/);
-  assert.match(iphonePreview, /&preview=\$\{previewVersion\}/);
+  assert.match(iphonePreview, /const appParams = new URLSearchParams\(location\.search\)/);
+  assert.match(iphonePreview, /appParams\.set\("screen", screen\)/);
+  assert.match(iphonePreview, /appFrame\.src = `\.\.\/\?\$\{appParams\.toString\(\)\}`/);
+  assert.match(iphonePreview, /const previewVersion = "32"/);
+  assert.match(iphonePreview, /appParams\.set\("preview", previewVersion\)/);
   assert.match(iphonePreview, /--safe-area-top", "59px"/);
   assert.match(iphonePreview, /--safe-area-bottom", "34px"/);
 });
@@ -318,7 +324,8 @@ test("全应用使用 14px Regular 正文和收敛的字体层级", () => {
 test("添加和编辑食物支持系统照片选择器而非强制打开相机", () => {
   assert.match(source, /id="photo-input" type="file" accept="image\/\*"/);
   assert.doesNotMatch(source, /capture="environment"/);
-  assert.match(source, /拍包装或选照片/);
+  assert.match(source, /aria-label="拍包装或选择照片"/);
+  assert.match(source, /figma-add-plus\.svg/);
 });
 
 test("补货清单使用轻量搜索、清晰状态 Tab 和图标关闭按钮", () => {
@@ -332,8 +339,9 @@ test("补货清单使用轻量搜索、清晰状态 Tab 和图标关闭按钮", 
 });
 
 test("所有输入框聚焦时只保留光标且不改变容器边框", () => {
-  assert.match(styles, /input:focus,[\s\S]*input:focus-visible\s*\{[\s\S]*outline: 0;[\s\S]*box-shadow: none/);
+  assert.match(styles, /input:focus,[\s\S]*input:focus-visible,[\s\S]*textarea:focus,[\s\S]*textarea:focus-visible\s*\{[\s\S]*outline: 0;[\s\S]*box-shadow: none/);
   assert.doesNotMatch(styles, /input:focus-visible,[\s\S]*outline: 3px solid/);
+  assert.doesNotMatch(styles, /textarea:focus-visible\s*\{[\s\S]*outline: 3px solid/);
   assert.doesNotMatch(styles, /\.record-picker-search:focus-within/);
   assert.doesNotMatch(styles, /\.library-sheet \.search-wrap:focus-within/);
   assert.doesNotMatch(styles, /\.profile-name-sheet-form input:focus/);
@@ -356,7 +364,7 @@ test("手机安全区、吸顶栏和文字输入使用机型自适应约束", ()
   assert.match(styles, /body\s*\{[\s\S]*overscroll-behavior-y: none/);
   assert.match(source, /data-mobile-keyboard/);
   assert.doesNotMatch(source, /包装识别将在下一阶段接入/);
-  assert.match(styles, /input:focus,[\s\S]*input:focus-visible\s*\{[\s\S]*outline: 0;[\s\S]*box-shadow: none/);
+  assert.match(styles, /input:focus,[\s\S]*input:focus-visible,[\s\S]*textarea:focus,[\s\S]*textarea:focus-visible\s*\{[\s\S]*outline: 0;[\s\S]*box-shadow: none/);
 });
 
 test("H5 UI 仅通过统一数据访问层读写持久数据", () => {
@@ -504,7 +512,7 @@ test("添加记录直达新品页并为已有产品字段提供联想", () => {
   assert.match(source, /autocompleteField\("brand", "品牌"[\s\S]*autocompleteField\("name", "产品名"/);
   assert.doesNotMatch(source, /field-name/);
   assert.doesNotMatch(styles, /\.field-name/);
-  assert.match(source, /autocompleteField\("flavor", "口味 \/ 肉源"/);
+  assert.match(source, /autocompleteField\("flavor", "肉源\/口味"/);
   assert.match(source, /role="listbox"/);
   assert.match(source, /data-autocomplete-option/);
   assert.match(source, /data-autocomplete-value=/);
@@ -514,9 +522,9 @@ test("添加记录直达新品页并为已有产品字段提供联想", () => {
   assert.match(styles, /\.autocomplete-option\s*\{[\s\S]*min-height: 44px/);
   assert.match(styles, /\.autocomplete-option:focus-visible/);
   assert.match(source, /class="fixed-bottom-action add-bottom-action"/);
-  assert.match(source, /class="primary-button fixed-bottom-action-button add-submit-button" type="submit" form="food-form">\$\{editing \? "保存" : "添加"\}/);
-  assert.match(styles, /\.fixed-bottom-action\s*\{[\s\S]*position: absolute;[\s\S]*bottom: 0;[\s\S]*padding: 9px 24px calc\(9px \+ var\(--safe-area-bottom\)\);[\s\S]*background: #ffffff/);
-  assert.match(styles, /\.fixed-bottom-action \.fixed-bottom-action-button\s*\{[\s\S]*min-height: 48px;[\s\S]*margin: 0/);
+  assert.match(source, /class="primary-button fixed-bottom-action-button add-submit-button" type="submit" form="food-form">保存<\/button>/);
+  assert.match(styles, /\/\* Figma add\/edit food form[\s\S]*\.fixed-bottom-action\s*\{[\s\S]*padding: 9px 20px calc\(9px \+ var\(--safe-area-bottom\)\);[\s\S]*background: #ffffff/);
+  assert.match(styles, /\/\* Figma add\/edit food form[\s\S]*\.fixed-bottom-action \.fixed-bottom-action-button\s*\{[\s\S]*min-height: 42px;[\s\S]*height: 42px;[\s\S]*border-radius: 100px/);
 });
 
 test("页面预览隐藏滚动条但保留滚动容器", () => {
@@ -547,24 +555,34 @@ test("添加页会用本地数据提示可能重复的产品", () => {
   assert.match(styles, /\.duplicate-food-notice\[hidden\]\s*\{[\s\S]*display: none/);
 });
 
-test("质地使用页面内选择器而不是原生下拉菜单", () => {
+test("类型与质地复用 Figma 选择抽屉而不是原生下拉菜单", () => {
   assert.match(
     source,
-    /const TEXTURE_OPTIONS = \["肉泥 \/ 慕斯", "肉块", "肉丝", "冻干块", "其他"\];/
+    /const TEXTURE_OPTIONS = \["肉泥\/慕斯", "肉块", "肉丝", "冻干", "其他"\];/
   );
-  assert.match(source, /function textureField\(value\)/);
-  assert.match(source, /data-texture-trigger/);
-  assert.match(source, /data-texture-menu/);
-  assert.match(source, /data-texture-option=/);
-  assert.match(source, /function chooseTextureOption\(option\)/);
-  assert.match(source, /function bindTextureSelect\(\)/);
-  assert.match(source, /function positionTextureMenu\(\)/);
+  assert.match(source, /function choiceField\(name, label, selectedValue, options/);
+  assert.match(source, /function choiceSheet\(name, title, selectedValue, options\)/);
+  assert.match(source, /choiceField\("foodType", "类型"/);
+  assert.match(source, /choiceField\("texture", "质地"/);
+  assert.match(source, /choiceSheet\("foodType", "类型"/);
+  assert.match(source, /choiceSheet\("texture", "质地"/);
+  assert.match(source, /function chooseChoiceOption\(option\)/);
+  assert.match(source, /function bindChoiceSheets\(\)/);
   assert.doesNotMatch(source, /<select name="texture">/);
-  assert.match(styles, /\.custom-select-trigger\s*\{[\s\S]*min-height: 34px/);
-  assert.match(styles, /\.custom-select-menu\s*\{[\s\S]*border-radius: 14px/);
-  assert.match(styles, /\.custom-select-field\.opens-up \.custom-select-menu/);
-  assert.match(styles, /\.custom-select-menu\[hidden\]\s*\{[\s\S]*display: none/);
-  assert.match(styles, /\.custom-select-option\s*\{[\s\S]*min-height: 44px/);
+  assert.match(styles, /\.choice-sheet-panel\s*\{[\s\S]*border-radius: 12px 12px 0 0/);
+  assert.match(styles, /\.choice-sheet-head\s*\{[\s\S]*min-height: 48px/);
+  assert.match(styles, /\.choice-sheet-option\s*\{[\s\S]*min-height: 56px/);
+  assert.match(styles, /\.choice-sheet-scrim\s*\{[\s\S]*background: rgba\(0, 0, 0, 0\.4\)/);
+  [
+    "figma-add-back.svg",
+    "figma-add-plus.svg",
+    "figma-add-chevron-right.svg",
+    "figma-sheet-close.svg",
+    "figma-radio-checked.svg",
+    "figma-radio-default.svg"
+  ].forEach((asset) => {
+    assert.ok(existsSync(join(__dirname, "..", "assets", "icons", asset)), `缺少 Figma 资源：${asset}`);
+  });
 });
 
 test("移动端操作提供触控尺寸、固定底部主操作和减少动态效果", () => {
@@ -579,7 +597,7 @@ test("非底部导航图标、标签、状态 Tab 和筛选项使用统一组件
   assert.match(styles, /--tag-height: 20px/);
   assert.match(styles, /\.ui-icon\s*\{[\s\S]*width: var\(--icon-size\);[\s\S]*height: var\(--icon-size\)/);
   assert.match(source, /class="status-badge status-tag status-/);
-  assert.match(source, /class="type-option"[\s\S]*class="filter-chip-label"/);
+  assert.match(source, /class="choice-sheet-option \$\{selected \? "selected" : ""\}"/);
   assert.match(styles, /\.status-tag\s*\{[\s\S]*height: var\(--tag-height\);[\s\S]*border-radius: var\(--tag-radius\)/);
   assert.match(styles, /\/\* Brand color application[\s\S]*\.status-tab\.active,[\s\S]*\.library-tab\.active\s*\{[\s\S]*color: var\(--brand-interactive-text\)/);
   assert.match(styles, /\.type-option input:checked \+ \.filter-chip-label\s*\{[\s\S]*background: var\(--filter-active-soft\)/);
@@ -595,6 +613,6 @@ test("品牌蓝色卡覆盖交互控件且不替代正向语义色", () => {
   assert.match(styles, /--filter-active: var\(--brand-interactive-text\)/);
   assert.match(styles, /--brand-button: var\(--brand-700\)/);
   assert.match(styles, /\/\* Brand color application[\s\S]*\.primary-button\s*\{[\s\S]*background: var\(--brand-button\)/);
-  assert.match(styles, /\/\* Brand color application[\s\S]*\.outcome-option\.selected\s*\{[\s\S]*background: var\(--brand-soft\)/);
+  assert.match(styles, /\/\* Brand color application[\s\S]*\.outcome-option\.selected \.outcome-icon-shell\s*\{[\s\S]*background: var\(--brand-100\)/);
   assert.match(styles, /\.status-repurchase,[\s\S]*background: var\(--mint-soft\);[\s\S]*color: #16763a/);
 });

@@ -212,10 +212,13 @@
       const stage = document.querySelector("[data-device-stage]");
       const device = document.querySelector("[data-device]");
       const appFrame = document.querySelector("[data-app-frame]");
-      const screen = new URLSearchParams(location.search).get("screen") || "home";
-      const previewVersion = "29";
+      const appParams = new URLSearchParams(location.search);
+      const screen = appParams.get("screen") || "home";
+      const previewVersion = "32";
 
-      appFrame.src = `../?screen=${encodeURIComponent(screen)}&preview=${previewVersion}`;
+      appParams.set("screen", screen);
+      appParams.set("preview", previewVersion);
+      appFrame.src = `../?${appParams.toString()}`;
       appFrame.addEventListener("load", () => {
         const appRoot = appFrame.contentDocument?.documentElement;
         appRoot?.style.setProperty("--safe-area-top", "59px");
