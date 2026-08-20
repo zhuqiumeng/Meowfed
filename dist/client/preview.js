@@ -119,7 +119,7 @@ const toast = document.querySelector("#toast");
 const rules = window.CatEatRules;
 const dataStore = window.CatEatData;
 const PAGE_THEME_COLORS = {
-  home: "#f7f9ff",
+  home: "#edf3ff",
   library: "#edf8ff",
   add: "#ffffff",
   feedback: "#ffffff",
@@ -145,6 +145,7 @@ const state = {
 
 let recentFeedLayoutFrame = 0;
 let recentFeedResizeObserver = null;
+let profileSheetScrollY = 0;
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -773,6 +774,73 @@ function home() {
     </main>
     ${bottomNav("home")}
     ${state.pickerOpen ? foodPicker() : ""}
+    ${renderCloudSyncCard()}
+  `;
+}
+
+function renderCloudSyncCard() {
+  const dataStore = window.CatEatData;
+  if (!dataStore) return "";
+  // SDK 完全没加载 → 不显示（云同步能力不可用）
+  if (!dataStore.isCloudBaseSdkAvailable()) return "";
+
+  // SDK 已加载但 env 未配 → 显示输入卡片，引导用户开启云同步
+  if (!dataStore.isCloudBaseConfigured()) {
+    return `
+      <section class="home-cloud-card" aria-label="云同步设置">
+        <header class="home-cloud-head">
+          <h3>云同步</h3>
+          <span class="home-cloud-status">未启用</span>
+        </header>
+        <p class="home-cloud-meta">填入 CloudBase 环境 ID，把数据备份到云端。ID 会保存在本地，下次启动自动启用。</p>
+        <form class="home-cloud-form" data-cloud-form>
+          <label class="home-cloud-form-label" for="cloud-env-input">CloudBase 环境 ID</label>
+          <input
+            id="cloud-env-input"
+            class="home-cloud-input"
+            name="cloudEnv"
+            type="text"
+            placeholder="例如：cat-eat-prod-xxxxxx"
+            autocomplete="off"
+            inputmode="text"
+            enterkeyhint="done"
+            data-mobile-keyboard
+          />
+          <button type="submit" class="cloud-button">保存并启用</button>
+        </form>
+      </section>
+    `;
+  }
+
+  // env 已配 → 完整卡片
+  const cs = dataStore.cloudSync;
+  if (!cs) return "";
+  const state = cs.getState();
+  const phaseLabel = {
+    idle: "未连接",
+    connecting: "连接中…",
+    ready: "已就绪",
+    syncing: "同步中…",
+    error: "同步出错"
+  }[state.phase] || state.phase;
+  const lastSync = state.lastSyncAt
+    ? new Date(state.lastSyncAt).toLocaleString("zh-CN", { hour12: false })
+    : "—";
+  return `
+    <section class="home-cloud-card" aria-label="云同步">
+      <header class="home-cloud-head">
+        <h3>云同步</h3>
+        <span class="home-cloud-status" data-cloud-phase="${state.phase}">${escapeHtml(phaseLabel)}</span>
+      </header>
+      <p class="home-cloud-meta">最近一次同步：${escapeHtml(lastSync)}</p>
+      ${state.error ? `<p class="home-cloud-error">${escapeHtml(state.error)}</p>` : ""}
+      <div class="home-cloud-actions">
+        <button type="button" class="cloud-button" data-cloud-action="push">首次上传到云</button>
+        <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="pull">从云恢复</button>
+        <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="sync-assets">同步照片</button>
+        <button type="button" class="cloud-button cloud-button-secondary home-cloud-disconnect" data-cloud-action="disconnect">断开</button>
+      </div>
+    </section>
   `;
 }
 
@@ -912,6 +980,10 @@ function foodPicker() {
           ${uiIcon("search", "search-icon")}
           <input
             data-picker-search
+            data-mobile-keyboard
+            type="search"
+            inputmode="search"
+            enterkeyhint="search"
             value="${escapeHtml(state.pickerQuery)}"
             placeholder="搜索品牌、口味或类型"
             aria-label="搜索已有食物"
@@ -963,6 +1035,114 @@ function profileNameSheet(catProfile) {
       </section>
     </div>
   `;
+}
+
+function syncProfileSheetViewport() {
+  const backdrop = document.querySelector(".profile-name-backdrop");
+  if (!backdrop) return;
+
+  const viewport = window.visualViewport;
+  const viewportTop = viewport?.offsetTop || 0;
+  const viewportHeight = viewport?.height || window.innerHeight;
+  backdrop.style.setProperty("--profile-viewport-top", `${viewportTop}px`);
+  backdrop.style.setProperty("--profile-viewport-height", `${viewportHeight}px`);
+}
+
+function lockProfileSheetPage() {
+  profileSheetScrollY = window.scrollY;
+  document.body.dataset.profileSheetOpen = "";
+  document.body.style.setProperty(
+    "--profile-sheet-scroll-offset",
+    `${-profileSheetScrollY}px`
+  );
+  syncProfileSheetViewport();
+  window.visualViewport?.addEventListener("resize", syncProfileSheetViewport);
+  window.visualViewport?.addEventListener("scroll", syncProfileSheetViewport);
+}
+
+function unlockProfileSheetPage() {
+  if (!document.body.hasAttribute("data-profile-sheet-open")) return;
+
+  window.visualViewport?.removeEventListener("resize", syncProfileSheetViewport);
+  window.visualViewport?.removeEventListener("scroll", syncProfileSheetViewport);
+  document.body.removeAttribute("data-profile-sheet-open");
+  document.body.style.removeProperty("--profile-sheet-scroll-offset");
+  window.scrollTo(0, profileSheetScrollY);
+}
+
+function closeProfileNameEditor({ restoreFocus = true } = {}) {
+  state.profileEditing = false;
+  document.querySelector(".profile-name-backdrop")?.remove();
+  unlockProfileSheetPage();
+
+  if (restoreFocus) {
+    requestAnimationFrame(() => {
+      document.querySelector("[data-edit-profile]")?.focus({ preventScroll: true });
+    });
+  }
+}
+
+function bindProfileNameSheetEvents(root = document) {
+  const sheet = root.querySelector("[data-profile-name-sheet]");
+  const backdrop = sheet?.closest(".profile-name-backdrop");
+  if (!sheet || !backdrop || backdrop.dataset.profileSheetBound === "true") return;
+  backdrop.dataset.profileSheetBound = "true";
+
+  backdrop.addEventListener(
+    "touchmove",
+    (event) => {
+      event.preventDefault();
+    },
+    { passive: false }
+  );
+
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) closeProfileNameEditor();
+  });
+
+  backdrop.querySelectorAll("button[data-close-profile]").forEach((button) => {
+    button.addEventListener("click", () => closeProfileNameEditor());
+  });
+
+  sheet.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeProfileNameEditor();
+  });
+
+  sheet.querySelector("#cat-profile-name-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const nickname = String(
+      new FormData(event.currentTarget).get("nickname") || ""
+    ).trim();
+    if (!nickname) {
+      showToast("请填写猫猫昵称");
+      return;
+    }
+    try {
+      await writeCatProfile({ ...readCatProfile(), nickname });
+      const nameLabel = document.querySelector("[data-profile-name-label]");
+      if (nameLabel) nameLabel.textContent = formatCatNickname(nickname);
+      closeProfileNameEditor({ restoreFocus: false });
+      showToast("昵称已保存");
+    } catch (error) {
+      showToast("昵称暂时没有保存成功");
+    }
+  });
+}
+
+function openProfileNameEditor() {
+  if (document.querySelector(".profile-name-backdrop")) return;
+
+  state.profileEditing = true;
+  app.insertAdjacentHTML("beforeend", profileNameSheet(readCatProfile()));
+  lockProfileSheetPage();
+  bindProfileNameSheetEvents(app);
+
+  requestAnimationFrame(() => {
+    syncProfileSheetViewport();
+    const profileName = document.querySelector("[data-profile-name]");
+    profileName?.focus({ preventScroll: true });
+    profileName?.select();
+  });
 }
 
 function normalizeTextureSelection(value) {
@@ -1158,6 +1338,9 @@ function feedback() {
         <span>备注 <small>选填，最多 120 字</small></span>
         <textarea
           data-feedback-note
+          data-mobile-keyboard
+          inputmode="text"
+          enterkeyhint="done"
           maxlength="120"
           rows="2"
           placeholder="例如：加了冻干才愿意吃"
@@ -1399,7 +1582,7 @@ function library() {
           </label>
           <div class="library-profile-name-row">
             <button class="library-cat-name" type="button" data-edit-profile aria-label="编辑猫猫昵称">
-              <span>${escapeHtml(formatCatNickname(catProfile.nickname))}</span>
+              <span data-profile-name-label>${escapeHtml(formatCatNickname(catProfile.nickname))}</span>
               ${uiIcon("edit", "library-name-edit-icon")}
             </button>
           </div>
@@ -1435,11 +1618,11 @@ function library() {
     </main>
     ${bottomNav("library")}
     ${state.pickerOpen ? foodPicker() : ""}
-    ${state.profileEditing ? profileNameSheet(catProfile) : ""}
   `;
 }
 
 function route(screen, params = {}, replace = false) {
+  closeProfileNameEditor({ restoreFocus: false });
   const prevScreen = state.screen;
   state.screen = screen === "record" ? "home" : screen;
   state.pickerOpen = false;
@@ -2090,6 +2273,7 @@ function bindEvents() {
   bindDuplicateFoodCheck();
   bindChoiceSheets();
   refreshDuplicateFoodNotice();
+  bindMobileKeyboardViewport();
 
   document.querySelectorAll("[data-mobile-keyboard]").forEach((input) => {
     input.addEventListener("pointerdown", () => {
@@ -2098,6 +2282,8 @@ function bindEvents() {
       }
     });
   });
+
+  document.querySelector("[data-edit-profile]")?.addEventListener("click", openProfileNameEditor);
 
   document.querySelectorAll("[data-nav]").forEach((element) => {
     element.addEventListener("click", () => {
@@ -2204,48 +2390,7 @@ function bindEvents() {
     });
   }
 
-  document.querySelector("[data-edit-profile]")?.addEventListener("click", () => {
-    state.profileEditing = true;
-    render();
-    const profileName = document.querySelector("[data-profile-name]");
-    profileName?.focus();
-    profileName?.select();
-  });
-
-  document.querySelectorAll("[data-close-profile]").forEach((element) => {
-    element.addEventListener("click", (event) => {
-      if (event.target !== element && !element.matches("button")) return;
-      state.profileEditing = false;
-      render();
-      document.querySelector("[data-edit-profile]")?.focus();
-    });
-  });
-
-  document.querySelector("[data-profile-name-sheet]")?.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    state.profileEditing = false;
-    render();
-    document.querySelector("[data-edit-profile]")?.focus();
-  });
-
-  document.querySelector("#cat-profile-name-form")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const nickname = String(
-      new FormData(event.currentTarget).get("nickname") || ""
-    ).trim();
-    if (!nickname) {
-      showToast("请填写猫猫昵称");
-      return;
-    }
-    try {
-      await writeCatProfile({ ...readCatProfile(), nickname });
-      state.profileEditing = false;
-      render();
-      showToast("昵称已保存");
-    } catch (error) {
-      showToast("昵称暂时没有保存成功");
-    }
-  });
+  bindProfileNameSheetEvents();
 
   document.querySelector("[data-load-demo]")?.addEventListener("click", async () => {
     try {
@@ -2284,6 +2429,75 @@ function bindEvents() {
   document.querySelector("[data-delete-food]")?.addEventListener("click", (event) => {
     deleteFood(event.currentTarget.dataset.deleteFood);
   });
+
+  // 云同步卡片按钮
+  document.querySelectorAll("[data-cloud-action]").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      const action = event.currentTarget.dataset.cloudAction;
+      const dataStore = window.CatEatData;
+      if (!dataStore) return;
+      try {
+        if (action === "push") {
+          if (!dataStore.cloudSync) return;
+          const result = await dataStore.cloudSync.pushFirstTime();
+          if (result.ok) {
+            showToast(`已上传 ${result.counts.foods || 0} 条食物`);
+          } else {
+            showToast(`上传失败：${result.error}`);
+          }
+        } else if (action === "pull") {
+          if (!dataStore.cloudSync) return;
+          const result = await dataStore.cloudSync.pullFromCloud();
+          if (result.ok) {
+            showToast(`已从云端恢复（${result.counts.foods || 0} 条食物）`);
+            render();
+          } else {
+            showToast(`恢复失败：${result.error}`);
+          }
+        } else if (action === "sync-assets") {
+          if (!dataStore.cloudSync) return;
+          const result = await dataStore.cloudSync.syncAssetsToCloud();
+          if (result.uploaded > 0 || result.skipped > 0) {
+            showToast(`已上传 ${result.uploaded} 张，跳过 ${result.skipped} 张`);
+          } else {
+            showToast("没有需要同步的照片");
+          }
+        } else if (action === "disconnect") {
+          if (!confirm("确定要断开云同步吗？\n本地数据会保留，下次输入环境 ID 可重新连接。")) return;
+          dataStore.setCloudBaseEnv("");
+          showToast("已断开云同步");
+          render();
+        }
+      } catch (error) {
+        showToast(`操作失败：${error.message || error}`);
+      }
+    });
+  });
+
+  // 云同步 env 输入表单
+  const cloudForm = document.querySelector("[data-cloud-form]");
+  if (cloudForm) {
+    cloudForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const dataStore = window.CatEatData;
+      if (!dataStore) return;
+      const formData = new FormData(cloudForm);
+      const env = String(formData.get("cloudEnv") || "").trim();
+      if (!env) {
+        showToast("请输入 CloudBase 环境 ID");
+        return;
+      }
+      // 简单合法性：CloudBase env ID 是字母数字和 dash 组成
+      if (!/^[a-zA-Z0-9-]{4,40}$/.test(env)) {
+        showToast("环境 ID 格式看起来不对，请检查后重试");
+        return;
+      }
+      dataStore.setCloudBaseEnv(env);
+      showToast("已保存，刷新页面后启用云同步");
+      // 刷新页面让 DataService 重新初始化（拿取 cloudSync 实例）
+      setTimeout(() => location.reload(), 600);
+    });
+  }
 
   const photoInput = document.querySelector("#photo-input");
   photoInput?.addEventListener("change", async () => {
@@ -2373,6 +2587,76 @@ function bindEvents() {
   });
 }
 
+let mobileKeyboardLayoutHeight = 0;
+
+function keyboardUsesResizedViewport(field) {
+  const page = document.documentElement.dataset.screen || "";
+  return Boolean(field?.closest?.('[role="dialog"], .fixed-page-shell')) ||
+    !["home", "library"].includes(page);
+}
+
+function currentViewportHeight() {
+  const viewport = window.visualViewport;
+  return viewport ? viewport.height + viewport.offsetTop : window.innerHeight;
+}
+
+function clearMobileKeyboardViewport() {
+  const root = document.documentElement;
+  delete root.dataset.mobileKeyboardMode;
+  root.style.removeProperty("--runtime-safe-area-bottom");
+  root.style.removeProperty("--mobile-keyboard-overlap");
+  mobileKeyboardLayoutHeight = Math.max(window.innerHeight, currentViewportHeight());
+}
+
+function syncMobileKeyboardViewport() {
+  const field = document.activeElement?.closest?.("[data-mobile-keyboard]");
+  if (!field) {
+    clearMobileKeyboardViewport();
+    return;
+  }
+
+  const root = document.documentElement;
+  const shouldResize = keyboardUsesResizedViewport(field);
+  const visibleHeight = currentViewportHeight();
+  mobileKeyboardLayoutHeight = Math.max(
+    mobileKeyboardLayoutHeight,
+    window.innerHeight,
+    visibleHeight
+  );
+  const keyboardOverlap = Math.max(0, Math.round(mobileKeyboardLayoutHeight - visibleHeight));
+
+  root.dataset.mobileKeyboardMode = shouldResize ? "resize" : "overlay";
+  if (shouldResize) {
+    root.style.setProperty("--runtime-safe-area-bottom", "0px");
+  } else {
+    root.style.removeProperty("--runtime-safe-area-bottom");
+  }
+  root.style.setProperty("--mobile-keyboard-overlap", `${keyboardOverlap}px`);
+}
+
+function bindMobileKeyboardViewport() {
+  const root = document.documentElement;
+  if (root.dataset.mobileKeyboardViewportBound === "true") return;
+  root.dataset.mobileKeyboardViewportBound = "true";
+  mobileKeyboardLayoutHeight = Math.max(window.innerHeight, currentViewportHeight());
+
+  document.addEventListener("focusin", (event) => {
+    if (!event.target.closest?.("[data-mobile-keyboard]")) return;
+    mobileKeyboardLayoutHeight = Math.max(
+      mobileKeyboardLayoutHeight,
+      window.innerHeight,
+      currentViewportHeight()
+    );
+    syncMobileKeyboardViewport();
+    requestAnimationFrame(syncMobileKeyboardViewport);
+  });
+  document.addEventListener("focusout", () => {
+    setTimeout(syncMobileKeyboardViewport, 0);
+  });
+  window.visualViewport?.addEventListener("resize", syncMobileKeyboardViewport);
+  window.visualViewport?.addEventListener("scroll", syncMobileKeyboardViewport);
+}
+
 window.addEventListener("resize", scheduleRecentFeedLayout);
 
 function render() {
@@ -2396,6 +2680,7 @@ function render() {
 }
 
 window.addEventListener("popstate", () => {
+  closeProfileNameEditor({ restoreFocus: false });
   const params = new URLSearchParams(location.search);
   const prevScreen = state.screen;
   state.screen = params.get("screen") === "record" ? "home" : params.get("screen") || "home";
