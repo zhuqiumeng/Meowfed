@@ -79,6 +79,9 @@ test("最近记录保持读屏顺序并使用两列独立堆叠的九像素信�
   assert.match(source, /new ResizeObserver\(scheduleRecentFeedLayout\)/);
   assert.match(styles, /\.recent-food-grid\.is-masonry\s*\{[\s\S]*position: relative;[\s\S]*display: block/);
   assert.match(styles, /\.recent-food-grid\.is-masonry \.recent-food-card\s*\{[\s\S]*position: absolute;[\s\S]*translate3d\(var\(--recent-card-x\), var\(--recent-card-y\), 0\)/);
+  assert.match(styles, /\.home-screen \.recent-food-card,[\s\S]*transition: none/);
+  assert.match(styles, /\.home-screen \.recent-food-grid:not\(\.is-masonry\) \.recent-food-card:active\s*\{[\s\S]*transform: none/);
+  assert.match(styles, /\.home-screen \.recent-food-grid\.is-masonry \.recent-food-card:active\s*\{[\s\S]*translate3d\(var\(--recent-card-x\), var\(--recent-card-y\), 0\)/);
 });
 
 test("首页食品卡遵循图片、标题、相关点、反馈和日期规格", () => {
@@ -147,14 +150,16 @@ test("H5 以 390×844 为设计基准并自适应宽高和安全区", () => {
 });
 
 test("真机状态栏跟随当前页面顶部背景而不是外层灰色画布", () => {
-  assert.match(source, /const PAGE_THEME_COLORS = \{[\s\S]*home: "#f7f9ff"[\s\S]*library: "#edf8ff"[\s\S]*detail: "#ffffff"/);
+  assert.match(source, /const PAGE_THEME_COLORS = \{[\s\S]*home: "#edf3ff"[\s\S]*library: "#edf8ff"[\s\S]*detail: "#ffffff"/);
   assert.match(source, /document\.documentElement\.dataset\.screen = screen/);
   assert.match(source, /document\.body\.dataset\.screen = screen/);
   assert.match(source, /meta\[name="theme-color"\][\s\S]*PAGE_THEME_COLORS\[screen\]/);
   assert.match(styles, /html\[data-screen="home"\],[\s\S]*body\[data-screen="home"\][\s\S]*--page-chrome-background:/);
   assert.match(styles, /html\[data-screen="library"\],[\s\S]*body\[data-screen="library"\][\s\S]*linear-gradient\(128deg, #edf8ff/);
   assert.match(styles, /html\[data-screen="add"\],[\s\S]*body\[data-screen="detail"\][\s\S]*--page-chrome-background: #ffffff/);
-  assert.match(styles, /body::before\s*\{[\s\S]*height: var\(--safe-area-top\);[\s\S]*background: var\(--page-chrome-background/);
+  assert.doesNotMatch(styles, /body::before\s*\{[\s\S]*height: var\(--safe-area-top\)/);
+  assert.match(styles, /\.home-screen\s*\{[\s\S]*padding:[\s\S]*var\(--safe-area-top\)/);
+  assert.match(styles, /\.library-cat-profile\s*\{[\s\S]*padding:[\s\S]*var\(--safe-area-top\)/);
   assert.match(styles, /\.fixed-page-shell\s*\{[\s\S]*background: #ffffff/);
   assert.doesNotMatch(styles, /html\s*\{[\s\S]*background: #f2f3f7/);
   assert.doesNotMatch(styles, /body\s*\{[\s\S]*background: #f2f3f7/);
@@ -208,10 +213,27 @@ test("iPhone 15 Pro 样机使用 393×852 内容视口并按窗口等比缩放",
   assert.match(iphonePreview, /const appParams = new URLSearchParams\(location\.search\)/);
   assert.match(iphonePreview, /appParams\.set\("screen", screen\)/);
   assert.match(iphonePreview, /appFrame\.src = `\.\.\/\?\$\{appParams\.toString\(\)\}`/);
-  assert.match(iphonePreview, /const previewVersion = "32"/);
+  assert.match(iphonePreview, /const previewVersion = "34"/);
   assert.match(iphonePreview, /appParams\.set\("preview", previewVersion\)/);
   assert.match(iphonePreview, /--safe-area-top", "59px"/);
-  assert.match(iphonePreview, /--safe-area-bottom", "34px"/);
+  assert.match(iphonePreview, /--preview-safe-area-bottom", "34px"/);
+  assert.match(iphonePreview, /class="simulated-keyboard"/);
+  assert.match(iphonePreview, /\.screen\.keyboard-open\.keyboard-resize iframe\s*\{[\s\S]*var\(--simulated-keyboard-height\)/);
+  assert.match(iphonePreview, /function bindSimulatedKeyboard\(\)[\s\S]*focusin[\s\S]*data-mobile-keyboard[\s\S]*focusout/);
+  assert.match(iphonePreview, /function keyboardUsesResizedViewport\(field\)[\s\S]*\[role="dialog"\], \.fixed-page-shell[\s\S]*!\["home", "library"\]\.includes\(page\)/);
+  assert.match(iphonePreview, /classList\.toggle\("keyboard-resize", shouldResize\)[\s\S]*classList\.toggle\("keyboard-overlay", !shouldResize\)/);
+  assert.match(iphonePreview, /setAppSafeAreaBottom\(shouldResize \? "0px" : "34px"\)/);
+  assert.match(iphonePreview, /function hideSimulatedKeyboard\(\)[\s\S]*setAppSafeAreaBottom\("34px"\)/);
+});
+
+test("真机键盘区分表单缩放与一级页覆盖两种模式", () => {
+  assert.match(styles, /--safe-area-bottom: var\([\s\S]*--runtime-safe-area-bottom,[\s\S]*--preview-safe-area-bottom,[\s\S]*env\(safe-area-inset-bottom, 0px\)/);
+  assert.match(styles, /html\[data-mobile-keyboard-mode="overlay"\] \.bottom-nav\s*\{[\s\S]*translateY\(var\(--mobile-keyboard-overlap\)\)/);
+  assert.match(source, /function keyboardUsesResizedViewport\(field\)[\s\S]*\[role="dialog"\], \.fixed-page-shell[\s\S]*!\["home", "library"\]\.includes\(page\)/);
+  assert.match(source, /function syncMobileKeyboardViewport\(\)[\s\S]*shouldResize[\s\S]*--runtime-safe-area-bottom", "0px"[\s\S]*removeProperty\("--runtime-safe-area-bottom"\)/);
+  assert.match(source, /root\.dataset\.mobileKeyboardMode = shouldResize \? "resize" : "overlay"/);
+  assert.match(source, /--mobile-keyboard-overlap[\s\S]*keyboardOverlap/);
+  assert.match(source, /window\.visualViewport\?\.addEventListener\("resize", syncMobileKeyboardViewport\)/);
 });
 
 test("补货清单使用状态 Tab 和按需出现的线框类型胶囊", () => {
@@ -258,6 +280,7 @@ test("补货清单顶部展示单猫头像并用底部抽屉编辑昵称，商�
   assert.match(source, /data-profile-name/);
   assert.match(source, /data-profile-name-sheet/);
   assert.match(source, /data-edit-profile/);
+  assert.match(source, /data-profile-name-label/);
   assert.match(source, /data-close-profile/);
   assert.match(source, /aria-label="编辑猫猫昵称"/);
   assert.match(source, /aria-label="猫猫昵称"/);
@@ -280,7 +303,16 @@ test("补货清单顶部展示单猫头像并用底部抽屉编辑昵称，商�
   assert.match(styles, /\.library-cat-avatar\s*\{[\s\S]*width: 96px;[\s\S]*border-radius: 50%/);
   assert.doesNotMatch(source, /library-profile-stats|library-summary|librarySummaryText|猫咪试吃概览|款吃过|款放心买/);
   assert.match(styles, /\.profile-name-backdrop\s*\{[\s\S]*padding: 0/);
+  assert.match(styles, /body\[data-profile-sheet-open\]\s*\{[\s\S]*position: fixed;[\s\S]*top: var\(--profile-sheet-scroll-offset, 0\);[\s\S]*overflow: hidden/);
+  assert.match(styles, /\.profile-name-backdrop\s*\{[\s\S]*height: var\(--profile-viewport-height, 100dvh\);[\s\S]*overscroll-behavior: none;[\s\S]*touch-action: none/);
   assert.match(styles, /\.modal-sheet\.profile-name-sheet\s*\{[\s\S]*width: 100%;[\s\S]*padding: 10px 24px calc\(9px \+ var\(--safe-area-bottom\)\);[\s\S]*border-radius: 24px 24px 0 0;[\s\S]*background: #ffffff/);
+  assert.match(styles, /\.modal-sheet\.profile-name-sheet\s*\{[\s\S]*align-self: flex-end;[\s\S]*overflow: hidden;[\s\S]*margin: 0/);
+  assert.match(source, /function openProfileNameEditor\(\)[\s\S]*insertAdjacentHTML\("beforeend", profileNameSheet\(readCatProfile\(\)\)\)[\s\S]*lockProfileSheetPage\(\)/);
+  assert.match(source, /function lockProfileSheetPage\(\)[\s\S]*window\.scrollY[\s\S]*dataset\.profileSheetOpen[\s\S]*window\.visualViewport\?\.addEventListener\("resize"/);
+  assert.match(source, /backdrop\.addEventListener\([\s\S]*"touchmove"[\s\S]*event\.preventDefault\(\)[\s\S]*passive: false/);
+  assert.match(source, /function route\([\s\S]*closeProfileNameEditor\(\{ restoreFocus: false \}\)/);
+  assert.match(source, /window\.addEventListener\("popstate"[\s\S]*closeProfileNameEditor\(\{ restoreFocus: false \}\)/);
+  assert.doesNotMatch(source, /state\.profileEditing = true;\s*render\(\);\s*const profileName/);
   assert.match(styles, /\.profile-name-sheet-form input\s*\{[\s\S]*min-height: 48px;[\s\S]*font-size: var\(--type-control-size\)/);
   assert.match(styles, /\.profile-name-sheet-head\s*\{[\s\S]*display: grid;[\s\S]*grid-template-columns: 44px minmax\(0, 1fr\) 44px/);
   assert.match(styles, /\.profile-name-sheet-head h2\s*\{[\s\S]*grid-column: 2;[\s\S]*text-align: center/);
@@ -350,7 +382,7 @@ test("所有输入框聚焦时只保留光标且不改变容器边框", () => {
 
 test("手机安全区、吸顶栏和文字输入使用机型自适应约束", () => {
   assert.match(styles, /--safe-area-top: env\(safe-area-inset-top, 0px\)/);
-  assert.match(styles, /--safe-area-bottom: env\(safe-area-inset-bottom, 0px\)/);
+  assert.match(styles, /--safe-area-bottom: var\([\s\S]*--runtime-safe-area-bottom,[\s\S]*--preview-safe-area-bottom,[\s\S]*env\(safe-area-inset-bottom, 0px\)/);
   assert.match(source, /class="fixed-page-shell add-page-shell"[\s\S]*class="screen no-tab fixed-page-scroll add-screen"/);
   assert.match(source, /class="fixed-page-shell feedback-page-shell"[\s\S]*class="screen no-tab fixed-page-scroll feedback-screen"/);
   assert.match(source, /class="fixed-page-shell detail-page-shell"[\s\S]*class="screen no-tab fixed-page-scroll detail-screen"/);
@@ -363,6 +395,8 @@ test("手机安全区、吸顶栏和文字输入使用机型自适应约束", ()
   assert.match(styles, /html\s*\{[\s\S]*overscroll-behavior-y: none/);
   assert.match(styles, /body\s*\{[\s\S]*overscroll-behavior-y: none/);
   assert.match(source, /data-mobile-keyboard/);
+  assert.match(source, /data-picker-search[\s\S]*data-mobile-keyboard[\s\S]*inputmode="search"/);
+  assert.match(source, /data-feedback-note[\s\S]*data-mobile-keyboard[\s\S]*enterkeyhint="done"/);
   assert.doesNotMatch(source, /包装识别将在下一阶段接入/);
   assert.match(styles, /input:focus,[\s\S]*input:focus-visible,[\s\S]*textarea:focus,[\s\S]*textarea:focus-visible\s*\{[\s\S]*outline: 0;[\s\S]*box-shadow: none/);
 });
