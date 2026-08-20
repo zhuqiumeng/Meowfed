@@ -1,0 +1,146 @@
+.library-page {
+  padding-bottom: 220rpx;
+}
+
+.library-count {
+  padding: 10rpx 18rpx;
+  border-radius: 999rpx;
+  background: #f7ff58;
+  font-size: 20rpx;
+  font-weight: 900;
+}
+
+.library-hero {
+  position: relative;
+  min-height: 310rpx;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  padding: 42rpx;
+  border-radius: 54rpx;
+  background-color: #b6ff2c;
+  background-image: url("/assets/style/lime-dots.png");
+  background-position: right 28rpx top 28rpx;
+  background-repeat: no-repeat;
+  background-size: 360rpx auto;
+}
+
+.library-hero__copy {
+  position: relative;
+  z-index: 2;
+  width: 66%;
+  display: flex;
+  flex-direction: column;
+}
+
+.library-hero__eyebrow {
+  font-size: 20rpx;
+  font-weight: 800;
+}
+
+.library-hero__title {
+  margin-top: 12rpx;
+  font-size: 47rpx;
+  font-weight: 950;
+  line-height: 1.12;
+  letter-spacing: -2rpx;
+}
+
+.library-hero__desc {
+  margin-top: 16rpx;
+  font-size: 21rpx;
+}
+
+.library-hero__icon {
+  position: absolute;
+  right: -4rpx;
+  bottom: -18rpx;
+  width: 280rpx;
+  height: 280rpx;
+  border-radius: 54rpx;
+}
+
+.search-box {
+  height: 92rpx;
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  margin-top: 24rpx;
+  padding: 0 25rpx;
+  border: 1rpx solid rgba(17, 23, 19, 0.08);
+  border-radius: 32rpx;
+  background: #ffffff;
+}
+
+.search-box__label {
+  font-size: 19rpx;
+  font-weight: 900;
+}
+
+.search-box__input {
+  min-width: 0;
+  flex: 1;
+  font-size: 23rpx;
+}
+
+.search-box__clear {
+  padding: 8rpx 12rpx;
+  border-radius: 999rpx;
+  background: #eef0ec;
+  font-size: 17rpx;
+  font-weight: 850;
+}
+
+.group-section {
+  margin-top: 44rpx;
+}
+
+.group-heading {
+  display: flex;
+  align-items: center;
+  gap: 15rpx;
+  margin-bottom: 22rpx;
+}
+
+.group-heading__icon {
+  width: 78rpx;
+  height: 78rpx;
+  flex: 0 0 auto;
+  border-radius: 22rpx;
+}
+
+.group-heading__copy {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.group-heading__title {
+  font-size: 32rpx;
+  font-weight: 950;
+}
+
+.group-heading__desc {
+  margin-top: 4rpx;
+  color: #7a817b;
+  font-size: 19rpx;
+}
+
+.group-heading__count {
+  min-width: 52rpx;
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  background: #ffffff;
+  font-size: 20rpx;
+  font-weight: 900;
+}
+
+.food-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20rpx;
+}

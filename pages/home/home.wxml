@@ -1,0 +1,121 @@
+<view class="page-shell home">
+  <view class="topbar">
+    <view class="topbar__brand">
+      <image class="topbar__logo" src="/assets/icons/phosphor-cat.png" mode="aspectFit" />
+      <text>猫吃了吗</text>
+    </view>
+    <view class="black-pill">挑食档案</view>
+  </view>
+
+  <view class="hero">
+    <view class="hero__copy">
+      <text class="hero__eyebrow">今日试吃</text>
+      <view class="hero__title">
+        <text>主子这次</text>
+        <text>愿意赏脸吗？</text>
+      </view>
+      <text class="hero__desc">拍下包装，吃完只点一下表现</text>
+      <button class="hero__action" bindtap="addFood">拍一款新品</button>
+    </view>
+    <text class="hero__tag">挑食研究所</text>
+    <image class="hero__cat" src="/assets/icons/phosphor-cat.png" mode="aspectFit" />
+  </view>
+
+  <scroll-view class="quick-strip" scroll-x enable-flex show-scrollbar="{{false}}">
+    <view class="quick-strip__inner">
+      <view class="quick-card" bindtap="addFood">
+        <image src="/assets/icons/phosphor-camera.png" mode="aspectFit" />
+        <view><text>拍新品</text><text>先记包装</text></view>
+      </view>
+      <view class="quick-card" bindtap="recordFirstTrial">
+        <image src="/assets/icons/phosphor-can.png" mode="aspectFit" />
+        <view><text>补反馈</text><text>点一下表现</text></view>
+      </view>
+      <view class="quick-card" bindtap="openLibrary">
+        <image src="/assets/icons/phosphor-heart.png" mode="aspectFit" />
+        <view><text>放心买</text><text>{{stats.repurchase}} 款入选</text></view>
+      </view>
+      <view class="quick-card" bindtap="openLibrary">
+        <image src="/assets/icons/phosphor-eyes.png" mode="aspectFit" />
+        <view><text>观察中</text><text>{{stats.trial}} 款在试</text></view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="restock-feature">
+    <view class="restock-feature__heading">
+      <view>
+        <text class="section-kicker">补货前先看</text>
+        <text class="restock-feature__title">主子投过的票</text>
+      </view>
+      <text class="black-pill">当前清单</text>
+    </view>
+    <view class="restock-feature__inner">
+      <image src="/assets/icons/phosphor-heart.png" mode="aspectFit" />
+      <view>
+        <text class="restock-feature__primary">{{stats.repurchase}} 款可以放心找车</text>
+        <text class="restock-feature__secondary">{{insight}}</text>
+      </view>
+      <text class="restock-feature__link" bindtap="openLibrary">查看</text>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__header">
+      <view>
+        <text class="section__title">还在观察</text>
+        <text class="section__hint">好反馈满 3 次，就能正式入选</text>
+      </view>
+      <text class="section__link" bindtap="openLibrary">全部</text>
+    </view>
+
+    <view wx:if="{{trialFoods.length}}" class="food-grid">
+      <food-card
+        wx:for="{{trialFoods}}"
+        wx:key="id"
+        food="{{item}}"
+        compact="{{true}}"
+        bind:select="openFood"
+      />
+    </view>
+
+    <view wx:else class="empty-state card">
+      <image class="empty-state__icon" src="/assets/icons/phosphor-can.png" mode="aspectFit" />
+      <view class="empty-state__title">暂时没有观察对象</view>
+      <view class="empty-state__text">拍下一款新品，开启它的三次试吃考核</view>
+      <button class="empty-state__demo" bindtap="loadDemo">先看看示例</button>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section__header">
+      <view>
+        <text class="section__title">最近尝过</text>
+        <text class="section__hint">记忆会淡，主子的投票不会</text>
+      </view>
+    </view>
+
+    <view wx:if="{{recentFoods.length}}" class="recent-list">
+      <view
+        wx:for="{{recentFoods}}"
+        wx:key="id"
+        class="recent-item"
+        bindtap="openFood"
+        data-id="{{item.id}}"
+      >
+        <view class="recent-item__swatch" style="background: {{item.color}}">
+          <image src="/assets/icons/phosphor-can.png" mode="aspectFit" />
+        </view>
+        <view class="recent-item__copy">
+          <text class="recent-item__name">{{item.name}}</text>
+          <text class="recent-item__meta">{{item.brand}} · {{item.flavor}}</text>
+        </view>
+        <view class="recent-item__status status-text--{{item.status.tone}}">
+          {{item.status.shortLabel}}
+        </view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<bottom-nav active="home" />

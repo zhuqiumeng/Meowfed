@@ -1,0 +1,26 @@
+<view class="food-card {{compact ? 'food-card--compact' : ''}}" bindtap="openDetail">
+  <view class="food-card__visual" style="background: {{food.color || '#F6FF8A'}}">
+    <image wx:if="{{food.photoPath}}" class="food-card__image" mode="aspectFill" src="{{food.photoPath}}" />
+    <image wx:else class="food-card__can" mode="aspectFit" src="/assets/icons/phosphor-can.png" />
+    <view class="food-card__status status--{{food.status.tone}}">
+      {{food.status.shortLabel}}
+    </view>
+  </view>
+
+  <view class="food-card__body">
+    <text class="food-card__brand">{{food.brand}}</text>
+    <text class="food-card__name">{{food.name}}</text>
+    <text class="food-card__meta">{{food.flavor}} · {{food.texture}}</text>
+
+    <view wx:if="{{food.status.key === 'trial'}}" class="food-card__progress">
+      <view class="progress">
+        <view class="progress__fill" style="width: {{food.progress / 3 * 100}}%"></view>
+      </view>
+      <text>{{food.progress}}/3</text>
+    </view>
+
+    <view wx:elif="{{food.latestOutcome}}" class="food-card__latest">
+      最近：{{food.latestOutcome.shortLabel}}
+    </view>
+  </view>
+</view>

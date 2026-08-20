@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/home/home",
+    "pages/add/add",
+    "pages/feedback/feedback",
+    "pages/library/library",
+    "pages/detail/detail"
+  ],
+  "window": {
+    "navigationStyle": "custom",
+    "backgroundColor": "#FFF8EF",
+    "backgroundTextStyle": "dark"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}

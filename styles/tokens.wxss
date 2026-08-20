@@ -1,0 +1,134 @@
+/* =============================================================
+ * 猫吃了吗 — Design Tokens
+ * -------------------------------------------------------------
+ * 集中存放所有颜色 / 圆角 / 间距 / 字号 / 字重 / 阴影 / 字体族
+ * 命名采用语义化：场景 + 角色，而非具体数值
+ * 所有变量都提供 fallback 值，基础库 < 2.6.0 时回退到硬编码
+ *
+ * 用法：
+ *   @import "/styles/tokens.wxss";
+ *   .my-class { color: var(--c-ink-primary, #111713); }
+ *
+ * 维护原则：
+ *   1. 新增 token：先想"用在哪类元素"，再起名
+ *   2. 同色不同透明度优先复用 ink / brand 系列
+ *   3. 高频值才进 token（出现 ≥3 次），低频值写注释
+ *   4. 命名统一前缀：--c- 颜色 / --r- 圆角 / --sp- 间距
+ *                  --fs- 字号 / --fw- 字重 / --shadow- 阴影
+ *                  --font- 字体族
+ * ============================================================= */
+
+/* ========== 颜色 · 文字 (Ink) ========== */
+--c-ink-primary:        #111713; /* 主文字 / 深色按钮底色 / 黑色徽标 */
+--c-ink-secondary:      #4b514c; /* 次级文字（如 latest hint） */
+--c-ink-tertiary:       #7a817b; /* 辅助文字（描述、meta、品牌副名） */
+--c-ink-quaternary:     #919892; /* 极弱文字（日期、低优先删除链接） */
+--c-ink-placeholder:    #a7aea8; /* 输入框占位符 */
+--c-ink-disabled:       #8b928c; /* 禁用态文字 */
+--c-ink-on-dark:        #ffffff; /* 深底（如黑胶囊）上的文字 */
+--c-ink-on-dark-soft:   #d9ded9; /* 深底次级文字 */
+--c-ink-on-yellow:      #52611f; /* 亮黄底上的标题文字 */
+--c-ink-on-yellow-soft: #59605a; /* 浅黄/米黄底上的提示文字 */
+--c-ink-error:          #d55a58; /* 错误/危险（如埋屎避雷标记） */
+
+/* ========== 颜色 · 背景 (Background) ========== */
+--c-bg-page:         #fff8ef; /* 页面米黄底（app.json window） */
+--c-bg-page-2:       #f4f5f1; /* 页面备用米灰底（app.wxss page 元素） */
+--c-bg-card:         #ffffff; /* 卡片/容器背景 */
+--c-bg-disabled:     #d5d9d3; /* 禁用态背景 */
+--c-bg-progress:     #e8ebe5; /* 进度条底色（未填充段） */
+
+/* ========== 颜色 · 品牌 (Brand) ========== */
+--c-brand-mint:        #b6ff2c; /* 主品牌：亮绿（hero / 徽标 / 进度条） */
+--c-brand-mint-soft:   #e9ffc6; /* 主品牌浅色：选中态 / 激活态背景 */
+--c-brand-yellow:      #f7ff58; /* 辅品牌：亮黄（hero / 提示徽标） */
+--c-brand-yellow-soft: #fff6bd; /* 辅品牌浅色：警告 / 提示条背景 */
+--c-brand-neutral:     #eef0ec; /* 中性浅灰（无法判断/未激活标签） */
+--c-brand-neutral-2:   rgba(255, 255, 255, 0.68); /* 半透明白（detail 评分 dot） */
+
+/* ========== 颜色 · 描边 (Line / Border) ========== */
+--c-line-soft:    rgba(17, 23, 19, 0.06); /* 极弱描边（bottom-nav 底） */
+--c-line:         rgba(17, 23, 19, 0.08); /* 标准描边（卡片、表单行、search） */
+--c-line-strong:  #eef0ec;                /* 浅灰描边/标签背景 */
+--c-line-selected: #111713;               /* 选中态粗描边（3rpx 黑色） */
+
+/* ========== 颜色 · 状态徽标 (Status Pill) ==========
+ * 四个状态：爱吃 / 正常 / 勉强 / 避雷
+ * 与 design-tokens.tokens.json 的 accent 色族保持语义一致
+ */
+--c-status-eager:      #b6ff2c; /* 主动吃 = mint */
+--c-status-okay:       #b6ff2c; /* 正常接受 = mint */
+--c-status-reluctant:  #f7ff58; /* 勉强吃 = yellow */
+--c-status-bury:       #111713; /* 埋屎避雷 = 黑色背景 + 白字 */
+--c-status-neutral:    #eef0ec; /* 没法判断 = 浅灰 */
+
+/* ========== 圆角 (Radius) ==========
+ * 猫吃了吗的灵魂：超圆润
+ * 保持现有阶梯，不向 DDMC 看齐
+ */
+--r-xs:    14rpx;  /* 小图标容器（bottom-nav icon） */
+--r-sm:    18rpx;  /* 中图标容器（bottom-nav camera、history-item icon） */
+--r-md:    22rpx;  /* 大图标容器（outcome icon、empty-state demo） */
+--r-md-lg: 24rpx;  /* status-banner 缩略图、quick-card image */
+--r-md-xl: 26rpx;  /* recent-item swatch */
+--r-form:  30rpx;  /* recognition-note 小条 */
+--r-input: 34rpx;  /* 输入框、save-button、assist-box */
+--r-card:  42rpx;  /* ★ 标准卡片圆角（出现最频繁，10+ 次） */
+--r-card-lg: 50rpx; /* 大卡片（bottom-nav 容器） */
+--r-card-xl: 58rpx; /* 超大卡片（hero、detail-visual） */
+--r-card-2xl: 66rpx; /* 顶级圆角（hero__cat、detail-visual__can） */
+--r-pill:  999rpx; /* ★ 胶囊（出现 20+ 次） */
+
+/* ========== 间距 (Spacing) ==========
+ * 高频值才进 token（出现 ≥3 次）
+ * 间距阶梯不齐：3px 基准在这里不完全适用（产品节奏更密）
+ */
+--sp-2:  6rpx;   /* 极小间距 */
+--sp-3:  9rpx;   /* 紧凑间距（kicker padding） */
+--sp-4:  12rpx;  /* 元素间 */
+--sp-5:  16rpx;  /* 字段间 */
+--sp-6:  18rpx;  /* ★ 卡片内元素（多列 gap） */
+--sp-7:  22rpx;  /* ★ 卡片内边距（容器 padding） */
+--sp-8:  28rpx;  /* 区块内边距（restock-feature） */
+--sp-9:  30rpx;  /* ★ 页面水平内边距 */
+--sp-10: 36rpx;  /* 大区块间 */
+--sp-11: 42rpx;  /* hero padding / 大区块内边距 */
+
+/* ========== 字号 (Font Size) ==========
+ * 保留 DDMC 的"用场景选字号"思路：Standard / Header / Paragraph
+ * 数值基于 rpx 换算（小程序 750rpx ≈ 375px）
+ */
+--fs-root:  28rpx;  /* page 根字号（app.wxss） */
+--fs-xs:    17rpx;  /* 极小（meta、status、empty-card） */
+--fs-sm:    19rpx;  /* 小（标签、字段、kicker、picker） */
+--fs-base:  22rpx;  /* 基础（描述、备注、prompt hint） */
+--fs-md:    26rpx;  /* 中（商卡标题、字段值、assist-chip 选中） */
+--fs-lg:    30rpx;  /* 中大（empty-state title、step heading） */
+--fs-xl:    40rpx;  /* 大（section title、品牌名、qualification score） */
+--fs-2xl:   47rpx;  /* 大页面标题（library/step heading） */
+--fs-3xl:   62rpx;  /* hero 标题（home） */
+
+/* ========== 字重 (Font Weight) ==========
+ * 整体偏重（800+ 为主），是奶萌设计语言的一部分
+ */
+--fw-regular: 400;  /* 标准 */
+--fw-medium:  700;  /* 字段值、辅文字 */
+--fw-bold:    800;  /* 标签、meta */
+--fw-extra:   850;  /* 强调、bottom-nav item */
+--fw-black:   900;  /* 主要按钮、徽标、商卡标题 */
+--fw-heavy:   950;  /* 标题、品牌 */
+
+/* ========== 阴影 (Shadow) ==========
+ * 默认柔和（rgba 5-22%），保留 7 个层级
+ * 阴影是层级表达，不是装饰
+ */
+--shadow-card-sm:   0 16rpx 42rpx rgba(17, 23, 19, 0.05); /* quick-card */
+--shadow-card:      0 18rpx 48rpx rgba(17, 23, 19, 0.06); /* food-card、form-card、food-identity */
+--shadow-card-lg:   0 20rpx 54rpx rgba(17, 23, 19, 0.08); /* card、photo-card.has-photo */
+--shadow-button:    0 18rpx 34rpx rgba(17, 23, 19, 0.17); /* primary-button */
+--shadow-orb:       0 20rpx 38rpx rgba(17, 23, 19, 0.22); /* bottom-nav 中央 add 球 */
+--shadow-nav:       0 28rpx 70rpx rgba(17, 23, 19, 0.18); /* 底部导航 */
+--shadow-topbar:    0 9rpx 28rpx rgba(17, 23, 19, 0.08);  /* topbar 按钮 */
+
+/* ========== 字体族 (Font Family) ========== */
+--font-family-base: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;

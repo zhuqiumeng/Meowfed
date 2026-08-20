@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN" data-screen="home">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#EDF3FF" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <script>
+      (() => {
+        const requestedScreen = new URLSearchParams(location.search).get("screen");
+        const screen = ["home", "library", "add", "feedback", "detail"].includes(requestedScreen)
+          ? requestedScreen
+          : "home";
+        const themeColors = {
+          home: "#edf3ff",
+          library: "#edf8ff",
+          add: "#ffffff",
+          feedback: "#ffffff",
+          detail: "#ffffff"
+        };
+
+        document.documentElement.dataset.screen = screen;
+        document
+          .querySelector('meta[name="theme-color"]')
+          ?.setAttribute("content", themeColors[screen]);
+      })();
+    </script>
+    <style>
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+        background:
+          radial-gradient(
+            72% 210px at 108% -18px,
+            rgba(105, 184, 255, 0.34) 0%,
+            rgba(181, 151, 255, 0.16) 44%,
+            transparent 74%
+          ),
+          #fafafa;
+      }
+
+      html[data-screen="library"],
+      html[data-screen="library"] body {
+        background: linear-gradient(128deg, #edf8ff 0%, #f2efff 42%, #fff2eb 72%, #edfff5 100%);
+      }
+
+      html[data-screen="add"],
+      html[data-screen="add"] body,
+      html[data-screen="feedback"],
+      html[data-screen="feedback"] body,
+      html[data-screen="detail"],
+      html[data-screen="detail"] body {
+        background: #ffffff;
+      }
+    </style>
+    <meta
+      name="description"
+      content="给挑食猫主人的轻量试吃档案，快速记录反馈并辅助补货判断。"
+    />
+    <title>猫吃了吗</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./assets/icons/app-icon-192.png" />
+    <link rel="stylesheet" href="./preview.css?v=34" />
+    <script defer src="./utils/rules.js"></script>
+    <script defer src="./utils/data-store.js"></script>
+    <script defer src="./preview.js?v=34"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <noscript>请开启 JavaScript 后使用「猫吃了吗」。</noscript>
+  </body>
+</html>

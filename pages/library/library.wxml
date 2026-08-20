@@ -1,0 +1,67 @@
+<view class="page-shell library-page">
+  <view class="topbar">
+    <view class="topbar__brand">
+      <image class="topbar__logo" src="/assets/icons/phosphor-cat.png" mode="aspectFit" />
+      <text>补货清单</text>
+    </view>
+    <view class="library-count">{{total}} 款</view>
+  </view>
+
+  <view class="library-hero">
+    <view class="library-hero__copy">
+      <text class="library-hero__eyebrow">库存快见底了吗？</text>
+      <text class="library-hero__title">先看主子投过的票</text>
+      <text class="library-hero__desc">当前有 {{buyCount}} 款可以放心找车</text>
+    </view>
+    <image class="library-hero__icon" src="/assets/icons/phosphor-package.png" mode="aspectFit" />
+  </view>
+
+  <view class="search-box">
+    <text class="search-box__label">搜索</text>
+    <input
+      class="search-box__input"
+      value="{{keyword}}"
+      placeholder="品牌、口味或质地"
+      bindinput="search"
+    />
+    <text wx:if="{{keyword}}" class="search-box__clear" bindtap="clearSearch">清除</text>
+  </view>
+
+  <view wx:if="{{groups.length}}">
+    <view wx:for="{{groups}}" wx:key="key" class="group-section group-section--{{item.tone}}">
+      <view class="group-heading">
+        <image class="group-heading__icon" src="{{item.iconPath}}" mode="aspectFit" />
+        <view class="group-heading__copy">
+          <text class="group-heading__title">{{item.title}}</text>
+          <text class="group-heading__desc">{{item.description}}</text>
+        </view>
+        <view class="group-heading__count">{{item.items.length}}</view>
+      </view>
+
+      <view class="food-grid">
+        <food-card
+          wx:for="{{item.items}}"
+          wx:for-item="food"
+          wx:key="id"
+          food="{{food}}"
+          compact="{{true}}"
+          bind:select="openFood"
+        />
+      </view>
+    </view>
+  </view>
+
+  <view wx:else class="empty-state card">
+    <image
+      class="empty-state__icon"
+      src="{{hasAnyFood ? '/assets/icons/phosphor-eyes.png' : '/assets/icons/phosphor-package.png'}}"
+      mode="aspectFit"
+    />
+    <view class="empty-state__title">{{hasAnyFood ? '没有找到这款' : '清单还是空的'}}</view>
+    <view class="empty-state__text">
+      {{hasAnyFood ? '换个品牌或口味关键词试试' : '完成几次试吃后，补货建议会自动出现在这里'}}
+    </view>
+  </view>
+</view>
+
+<bottom-nav active="library" />

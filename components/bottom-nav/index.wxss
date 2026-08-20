@@ -1,0 +1,70 @@
+.bottom-nav {
+  position: fixed;
+  z-index: 50;
+  right: 24rpx;
+  bottom: calc(env(safe-area-inset-bottom) + 22rpx);
+  left: 24rpx;
+  height: 136rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 12rpx 32rpx;
+  border: 1rpx solid rgba(17, 23, 19, 0.06);
+  border-radius: 50rpx;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 28rpx 70rpx rgba(17, 23, 19, 0.18);
+}
+
+.bottom-nav__item {
+  width: 170rpx;
+  height: 100rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2rpx;
+  border-radius: 32rpx;
+  color: #7a817b;
+  font-size: 19rpx;
+  font-weight: 850;
+}
+
+.bottom-nav__item.is-active {
+  color: #111713;
+  background: #e9ffc6;
+}
+
+.bottom-nav__icon {
+  width: 58rpx;
+  height: 58rpx;
+  border-radius: 14rpx;
+}
+
+.bottom-nav__add {
+  width: 144rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5rpx;
+  margin-top: -54rpx;
+  color: #111713;
+  font-size: 19rpx;
+  font-weight: 900;
+}
+
+.bottom-nav__add-orb {
+  width: 96rpx;
+  height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 34rpx;
+  background: #111713;
+  box-shadow: 0 20rpx 38rpx rgba(17, 23, 19, 0.22);
+}
+
+.bottom-nav__camera {
+  width: 78rpx;
+  height: 78rpx;
+  border-radius: 18rpx;
+}
