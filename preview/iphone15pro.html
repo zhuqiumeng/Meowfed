@@ -63,6 +63,7 @@
       }
 
       .screen {
+        --simulated-keyboard-height: 291px;
         position: relative;
         width: 393px;
         height: 852px;
@@ -77,6 +78,103 @@
         display: block;
         border: 0;
         background: #fafafa;
+      }
+
+      .screen.keyboard-open.keyboard-resize iframe {
+        height: calc(852px - var(--simulated-keyboard-height));
+      }
+
+      .simulated-keyboard {
+        position: absolute;
+        z-index: 6;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: var(--simulated-keyboard-height);
+        display: flex;
+        visibility: hidden;
+        flex-direction: column;
+        gap: 7px;
+        padding: 0 4px 25px;
+        background: #d1d4d9;
+        opacity: 0;
+        transform: translateY(100%);
+        pointer-events: none;
+      }
+
+      .screen.keyboard-open .simulated-keyboard {
+        visibility: visible;
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .keyboard-candidates {
+        height: 36px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        align-items: center;
+        border-bottom: 1px solid rgba(60, 60, 67, 0.18);
+        color: #202124;
+        font-size: 14px;
+        text-align: center;
+      }
+
+      .keyboard-candidates span + span {
+        border-left: 1px solid rgba(60, 60, 67, 0.18);
+      }
+
+      .keyboard-row {
+        min-height: 42px;
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      .keyboard-row-offset {
+        padding: 0 18px;
+      }
+
+      .keyboard-key {
+        min-width: 0;
+        flex: 1;
+        height: 42px;
+        display: grid;
+        place-items: center;
+        border-radius: 5px;
+        background: #ffffff;
+        box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.34);
+        color: #111214;
+        font-size: 21px;
+        font-weight: 400;
+        line-height: 1;
+        text-transform: lowercase;
+      }
+
+      .keyboard-key-system {
+        max-width: 46px;
+        background: #aeb3bb;
+        font-size: 16px;
+      }
+
+      .keyboard-key-space {
+        flex: 4.7;
+        font-size: 15px;
+      }
+
+      .keyboard-key-return {
+        flex: 1.6;
+        background: #4571fc;
+        color: #ffffff;
+        font-size: 15px;
+      }
+
+      .keyboard-bottom-row {
+        margin-top: auto;
+      }
+
+      .screen.keyboard-open .home-indicator {
+        z-index: 8;
+        background: rgba(0, 0, 0, 0.82);
       }
 
       .dynamic-island {
@@ -187,6 +285,28 @@
           <span class="side-button power-button" aria-hidden="true"></span>
           <div class="screen">
             <iframe title="猫吃了吗手机预览" data-app-frame></iframe>
+            <div class="simulated-keyboard" data-simulated-keyboard aria-hidden="true">
+              <div class="keyboard-candidates">
+                <span>我</span>
+                <span>猫猫</span>
+                <span>可以</span>
+              </div>
+              <div class="keyboard-row">
+                <span class="keyboard-key">q</span><span class="keyboard-key">w</span><span class="keyboard-key">e</span><span class="keyboard-key">r</span><span class="keyboard-key">t</span><span class="keyboard-key">y</span><span class="keyboard-key">u</span><span class="keyboard-key">i</span><span class="keyboard-key">o</span><span class="keyboard-key">p</span>
+              </div>
+              <div class="keyboard-row keyboard-row-offset">
+                <span class="keyboard-key">a</span><span class="keyboard-key">s</span><span class="keyboard-key">d</span><span class="keyboard-key">f</span><span class="keyboard-key">g</span><span class="keyboard-key">h</span><span class="keyboard-key">j</span><span class="keyboard-key">k</span><span class="keyboard-key">l</span>
+              </div>
+              <div class="keyboard-row">
+                <span class="keyboard-key keyboard-key-system" aria-hidden="true">⇧</span><span class="keyboard-key">z</span><span class="keyboard-key">x</span><span class="keyboard-key">c</span><span class="keyboard-key">v</span><span class="keyboard-key">b</span><span class="keyboard-key">n</span><span class="keyboard-key">m</span><span class="keyboard-key keyboard-key-system" aria-hidden="true">⌫</span>
+              </div>
+              <div class="keyboard-row keyboard-bottom-row">
+                <span class="keyboard-key keyboard-key-system">123</span>
+                <span class="keyboard-key keyboard-key-system" aria-hidden="true">◎</span>
+                <span class="keyboard-key keyboard-key-space">空格</span>
+                <span class="keyboard-key keyboard-key-return" data-keyboard-return>完成</span>
+              </div>
+            </div>
             <div class="status-bar" aria-label="iPhone 状态栏">
               <span class="status-time">9:41</span>
               <span class="status-system-icons" aria-hidden="true">
@@ -211,18 +331,83 @@
       const DEVICE_HEIGHT = 880;
       const stage = document.querySelector("[data-device-stage]");
       const device = document.querySelector("[data-device]");
+      const screenElement = document.querySelector(".screen");
       const appFrame = document.querySelector("[data-app-frame]");
+      const keyboardReturn = document.querySelector("[data-keyboard-return]");
       const appParams = new URLSearchParams(location.search);
       const screen = appParams.get("screen") || "home";
-      const previewVersion = "32";
+      const previewVersion = "34";
 
       appParams.set("screen", screen);
       appParams.set("preview", previewVersion);
       appFrame.src = `../?${appParams.toString()}`;
+
+      function keyboardReturnLabel(field) {
+        const hint = field?.getAttribute("enterkeyhint") || "";
+        return {
+          search: "搜索",
+          next: "下一项",
+          send: "发送",
+          go: "前往",
+          done: "完成"
+        }[hint] || "完成";
+      }
+
+      function keyboardUsesResizedViewport(field) {
+        const page = field?.ownerDocument?.documentElement?.dataset?.screen || "";
+        return Boolean(field?.closest?.('[role="dialog"], .fixed-page-shell')) ||
+          !["home", "library"].includes(page);
+      }
+
+      function setAppSafeAreaBottom(value) {
+        appFrame.contentDocument?.documentElement?.style.setProperty(
+          "--preview-safe-area-bottom",
+          value
+        );
+      }
+
+      function showSimulatedKeyboard(field) {
+        if (!field?.matches?.("[data-mobile-keyboard]")) return;
+        const shouldResize = keyboardUsesResizedViewport(field);
+        keyboardReturn.textContent = keyboardReturnLabel(field);
+        screenElement.classList.add("keyboard-open");
+        screenElement.classList.toggle("keyboard-resize", shouldResize);
+        screenElement.classList.toggle("keyboard-overlay", !shouldResize);
+        setAppSafeAreaBottom(shouldResize ? "0px" : "34px");
+        if (shouldResize) {
+          requestAnimationFrame(() => {
+            field.scrollIntoView({ block: "center", inline: "nearest" });
+          });
+        }
+      }
+
+      function hideSimulatedKeyboard() {
+        screenElement.classList.remove("keyboard-open", "keyboard-resize", "keyboard-overlay");
+        setAppSafeAreaBottom("34px");
+      }
+
+      function bindSimulatedKeyboard() {
+        const frameDocument = appFrame.contentDocument;
+        if (!frameDocument || frameDocument.documentElement.dataset.keyboardPreviewBound === "true") {
+          return;
+        }
+        frameDocument.documentElement.dataset.keyboardPreviewBound = "true";
+        frameDocument.addEventListener("focusin", (event) => {
+          showSimulatedKeyboard(event.target.closest?.("[data-mobile-keyboard]"));
+        });
+        frameDocument.addEventListener("focusout", () => {
+          setTimeout(() => {
+            const active = frameDocument.activeElement;
+            if (!active?.matches?.("[data-mobile-keyboard]")) hideSimulatedKeyboard();
+          }, 0);
+        });
+      }
+
       appFrame.addEventListener("load", () => {
         const appRoot = appFrame.contentDocument?.documentElement;
         appRoot?.style.setProperty("--safe-area-top", "59px");
-        appRoot?.style.setProperty("--safe-area-bottom", "34px");
+        appRoot?.style.setProperty("--preview-safe-area-bottom", "34px");
+        bindSimulatedKeyboard();
       });
 
       function fitDevice() {
