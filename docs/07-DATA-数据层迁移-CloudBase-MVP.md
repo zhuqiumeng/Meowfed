@@ -416,14 +416,57 @@ MVP 改动**全部 feature-flag 隔离**：
 
 部署到生产前确认：
 
-- [ ] CloudBase 环境已创建，匿名登录已开启
-- [ ] 数据库安全规则：`仅创建者可读写`（MVP 推荐仅 `_openid` 维度）
-- [ ] 云存储 bucket 已创建，权限同上
-- [ ] `npm test` 87/87 全绿
+- [ ] CloudBase 环境已创建
+- [ ] **匿名登录已开启**（用户管理 → 登录方式 → 匿名登录）；不开则 SDK `auth.signInAnonymously()` 挂起
+- [ ] **云存储 bucket 已创建**（存储管理 → 共 N 条/暂无存储桶 → 创建存储桶）
+- [ ] 数据库 + 存储桶的 **PostgreSQL RLS 策略**已配置（当前是 RLS 模型，JSON 规则不适用；详见 §8.1）
+- [ ] `npm test` 100/100 全绿
 - [ ] `npm run validate` 小程序编译通过
 - [ ] iPhone PWA 真机走完 §5.3 全部 11 步
 - [ ] 已知限制 §6 已读，PM/客服能向用户解释
 - [ ] 回滚方案 §7 在 Runbook 中可查
+
+### 8.1 PostgreSQL RLS 权限配置（实测适配）
+
+CloudBase 新版控制台使用 PostgreSQL RLS（Row Level Security）模型，**不再支持旧版 JSON 安全规则**。配置入口：
+
+#### 数据库（cats / foods / results / assets / meta 5 个集合）
+
+```
+腾讯云开发控制台
+  → 云数据库
+    → 你的环境
+      → 集合（cats / foods / results / assets / meta）
+        → 权限
+          → 新建 Policy
+```
+
+- 角色：`anon`（匿名登录用户）
+- 动作：SELECT / INSERT / UPDATE / DELETE
+- USING 表达式（SELECT/DELETE 用）：`auth.uid() = _openid`
+- WITH CHECK 表达式（INSERT/UPDATE 用）：`auth.uid() = _openid`
+
+> MVP 起步建议：先放开 `auth.role() = 'anon'` 的所有动作（不限制 `_openid`），用工具人账号 + 真实匿名账号联调 1 次，确认流程通了再收紧到 `auth.uid() = _openid`。
+
+#### 云存储（bucket）
+
+```
+腾讯云开发控制台
+  → 云存储
+    → 存储管理
+      → 你的 bucket
+        → 访问策略
+          → 新建 Policy
+```
+
+- 角色：`anon`
+- 动作：read / write / delete
+- 表达式：`resource.path LIKE 'cat-eat-assets/%'`
+
+#### 5 步连通性诊断
+
+SDK 配好之后，跑 `node tests/cloudbase-live-diag.js <env-id>` 自动验证 5 步：
+init app → 匿名登录 → 写探针记录 → 读回 → 上传探针文件。任一步失败会打印针对性解决建议。
 
 ---
 
