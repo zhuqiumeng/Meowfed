@@ -21,8 +21,20 @@
       crypto: globalScope.crypto,
       URL: globalScope.URL
     });
-    globalScope.CatEatData = services.indexeddb || services.legacy;
     globalScope.CatEatDataServices = services;
+    // CatEatData 始终指向 factory API（带 withActive 转发的统一门面）。
+    // v1.1 修：之前 getter 优先返回 active service（indexeddb/legacy），
+    // 但 legacy service 没有 cloudbase 集成方法（isCloudBaseSdkAvailable
+    // 等只在 api 上），导致 renderCloudSyncCard 第二次读 CatEatData 时
+    // 拿到 legacy、抛 TypeError、#app 保持空白。
+    // api 上 getFoods/saveFood 等通过 withActive 转发到 active service，
+    // 行为跟直接拿 service 一致；cloudbase 方法也都在 api 上。
+    Object.defineProperty(globalScope, "CatEatData", {
+      configurable: true,
+      get() {
+        return services;
+      }
+    });
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function createDataStore(options = {}) {
   const DB_NAME = "cat-eat-local";
