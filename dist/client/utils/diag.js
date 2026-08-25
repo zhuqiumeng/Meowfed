@@ -262,8 +262,25 @@
     all: actionAll,
     drift: actionDrift,
     export: actionExport,
-    fix: actionFix
+    fix: actionFix,
+    cloudsync: actionCloudSync
   };
+
+  async function actionCloudSync(_unused, dataStore) {
+    if (!dataStore) return "CatEatData 不可用";
+    const out = {
+      sdkAvailable: typeof dataStore.isCloudBaseSdkAvailable === "function" ? dataStore.isCloudBaseSdkAvailable() : "no-method",
+      sdkConfigured: typeof dataStore.isCloudBaseConfigured === "function" ? dataStore.isCloudBaseConfigured() : "no-method",
+      getCloudBaseEnv: typeof dataStore.getCloudBaseEnv === "function" ? dataStore.getCloudBaseEnv() : "no-method",
+      cloudSyncExists: !!dataStore.cloudSync,
+      globalCloudbase: typeof globalThis.cloudbase,
+      globalCloudbaseKeys: globalThis.cloudbase ? Object.keys(globalThis.cloudbase).slice(0, 10) : null
+    };
+    if (dataStore.cloudSync && typeof dataStore.cloudSync.getState === "function") {
+      out.cloudSyncState = dataStore.cloudSync.getState();
+    }
+    return safeStringify(out);
+  }
 
   globalScope.CatEatDiag = {
     run(action, dataStore) {
