@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Rescue · 数据找回</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; padding: 16px; max-width: 720px; margin: 0 auto; }
+    h1 { color: #d9534f; }
+    h2 { color: #5bc0de; margin-top: 24px; }
+    pre { background: #f5f5f5; padding: 8px; overflow: auto; font-size: 11px; max-height: 320px; }
+    button { font-size: 16px; padding: 12px 20px; margin: 4px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+    button.primary { background: #d9534f; color: #fff; border-color: #d9534f; }
+    .status { padding: 8px; background: #fff8dc; border-radius: 4px; margin: 8px 0; }
+    .ok { color: #3c763d; }
+    .warn { color: #8a6d3b; }
+    .err { color: #a94442; }
+  </style>
+</head>
+<body>
+  <h1>🆘 数据找回工具</h1>
+  <p>按顺序点下面 6 个按钮，把每段输出复制发回给我（Mavis）。</p>
+
+  <h2>Step 1 · 扫所有 localStorage 残留</h2>
+  <button class="primary" onclick="step1()">扫 localStorage</button>
+  <pre id="out1">（点上面按钮开始）</pre>
+
+  <h2>Step 2 · 扫所有 IndexedDB 库</h2>
+  <button onclick="step2()">扫 IndexedDB</button>
+  <pre id="out2">（点上面按钮开始）</pre>
+
+  <h2>Step 3 · 读 IndexedDB "cat-eat-local" 详细数据</h2>
+  <button onclick="step3()">读 cat-eat-local</button>
+  <pre id="out3">（点上面按钮开始）</pre>
+
+  <h2>Step 4 · catId 漂移诊断 + 食物清单</h2>
+  <button onclick="step4()">诊断 + 列食物</button>
+  <pre id="out4">（点上面按钮开始）</pre>
+
+  <h2>Step 5 · 一键导出（JSON 文件下载到本地）</h2>
+  <button class="primary" onclick="step5()">导出全量 JSON</button>
+  <pre id="out5">（点上面按钮开始）</pre>
+
+  <h2>Step 6 · 重新绑定 catId（如果诊断出漂移）</h2>
+  <div class="status warn" id="step6status">⚠️ 这步会改 IndexedDB 里的 catId。先看 Step 4 输出确认有漂移再点。</div>
+  <button onclick="step6()">把所有食物.catId 改成 meta.catId</button>
+  <pre id="out6">（点上面按钮开始）</pre>
+
+<script>
+  function $(id) { return document.getElementById(id); }
+  function show(id, content) { $(id).textContent = content; }
+  function safe(o) {
+    try { return JSON.stringify(o, (k, v) => v instanceof Blob ? "[Blob " + v.size + "B " + v.type + "]" : v, 2); }
+    catch (e) { return "[unstringifiable: " + e.message + "]"; }
+  }
+
+  function step1() {
+    const out = { origin: location.origin, length: localStorage.length, items: {} };
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const val = localStorage.getItem(key);
+      let parsed = val;
+      try { parsed = JSON.parse(val); } catch (e) {}
+      out.items[key] = parsed;
+    }
+    show("out1", safe(out));
+  }
+
+  async function step2() {
+    if (!indexedDB.databases) {
+      show("out2", "你的浏览器不支持 indexedDB.databases()（Safari 旧版），用 Step 3 直接读 cat-eat-local");
+      return;
+    }
+    const dbs = await indexedDB.databases();
+    show("out2", safe(dbs.map(d => ({ name: d.name, version: d.version }))));
+  }
+
+  function openDb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("cat-eat-local");
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  function getAll(storeName) {
+    return new Promise((resolve, reject) => {
+      openDb().then(db => {
+        if (!db.objectStoreNames.contains(storeName)) {
+          db.close();
+          return resolve("[no such store]");
+        }
+        const tx = db.transaction(storeName, "readonly");
+        const req = tx.objectStore(storeName).getAll();
+        req.onsuccess = () => { db.close(); resolve(req.result); };
+        req.onerror = () => { db.close(); reject(req.error); };
+      }).catch(reject);
+    });
+  }
+  function getMeta() {
+    return new Promise((resolve, reject) => {
+      openDb().then(db => {
+        if (!db.objectStoreNames.contains("meta")) {
+          db.close();
+          return resolve([]);
+        }
+        const tx = db.transaction("meta", "readonly");
+        const req = tx.objectStore("meta").getAll();
+        req.onsuccess = () => { db.close(); resolve(req.result); };
+        req.onerror = () => { db.close(); reject(req.error); };
+      }).catch(reject);
+    });
+  }
+
+  async function step3() {
+    try {
+      const meta = await getMeta();
+      const cats = await getAll("cats");
+      const foods = await getAll("foods");
+      const results = await getAll("results");
+      const assets = await getAll("assets");
+      const out = {
+        meta: meta,
+        counts: { cats: cats.length, foods: foods.length, results: results.length, assets: assets.length },
+        cats: cats.map(c => ({ id: c.id, nickname: c.nickname, ageYears: c.ageYears, photoAssetId: c.photoAssetId })),
+        foods: foods.map(f => ({ id: f.id, catId: f.catId, legacyId: f.legacyId, brand: f.brand, name: f.name, createdAt: f.createdAt, photoAssetId: f.photoAssetId }))
+      };
+      show("out3", safe(out));
+    } catch (e) {
+      show("out3", "ERR: " + e.message);
+    }
+  }
+
+  async function step4() {
+    try {
+      const meta = await getMeta();
+      const catMeta = meta.find(m => m.key === "catId");
+      const currentCatId = catMeta && catMeta.value;
+      const foods = await getAll("foods");
+      const cats = await getAll("cats");
+      const lines = [];
+      lines.push("meta.catId = " + currentCatId);
+      lines.push("foods 总数: " + foods.length);
+      lines.push("cats 总数: " + cats.length);
+      const foodCatIds = new Set(foods.map(f => f.catId));
+      const catIds = new Set(cats.map(c => c.id));
+      lines.push("foods 涉及 catId: " + safe(Array.from(foodCatIds)));
+      lines.push("cats 涉及 catId: " + safe(Array.from(catIds)));
+      lines.push("---");
+      lines.push("匹配当前 catId 的食物数: " + foods.filter(f => f.catId === currentCatId).length);
+      lines.push("不匹配的食物数: " + foods.filter(f => f.catId !== currentCatId).length);
+      lines.push("---");
+      lines.push("每条食物的 catId / brand / name:");
+      foods.forEach((f, i) => {
+        const mark = f.catId === currentCatId ? "✓" : "✗ DRIFT";
+        lines.push((i+1) + ". [" + mark + "] catId=" + f.catId + " | " + f.brand + " / " + f.name);
+      });
+      lines.push("---");
+      lines.push("每条 cat 的 id / nickname:");
+      cats.forEach((c, i) => {
+        const mark = c.id === currentCatId ? "✓ current" : "";
+        lines.push((i+1) + ". " + c.id + " (" + c.nickname + ") " + mark);
+      });
+      show("out4", lines.join("\n"));
+    } catch (e) {
+      show("out4", "ERR: " + e.message);
+    }
+  }
+
+  async function step5() {
+    try {
+      const meta = await getMeta();
+      const cats = await getAll("cats");
+      const foods = await getAll("foods");
+      const results = await getAll("results");
+      const assets = await getAll("assets");
+      const dump = {
+        _exportedAt: new Date().toISOString(),
+        origin: location.origin,
+        meta, cats, foods, results, assets
+      };
+      const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "cat-eat-rescue-" + Date.now() + ".json";
+      a.click();
+      URL.revokeObjectURL(url);
+      show("out5", "✅ 下载已触发。文件大小约 " + (blob.size/1024).toFixed(1) + " KB");
+    } catch (e) {
+      show("out5", "ERR: " + e.message);
+    }
+  }
+
+  async function step6() {
+    if (!confirm("这会把所有食物的 catId 改成 meta.catId。确认吗？")) return;
+    try {
+      const meta = await getMeta();
+      const catMeta = meta.find(m => m.key === "catId");
+      const currentCatId = catMeta && catMeta.value;
+      if (!currentCatId) { show("out6", "❌ meta 里没有 catId"); return; }
+      const foods = await getAll("foods");
+      const targets = foods.filter(f => f.catId !== currentCatId);
+      if (targets.length === 0) { show("out6", "没有需要修复的食物（都已匹配）"); return; }
+
+      await new Promise((resolve, reject) => {
+        const req = indexedDB.open("cat-eat-local");
+        req.onsuccess = () => {
+          const db = req.result;
+          const tx = db.transaction("foods", "readwrite");
+          const store = tx.objectStore("foods");
+          targets.forEach(f => {
+            f.catId = currentCatId;
+            store.put(f);
+          });
+          tx.oncomplete = () => { db.close(); resolve(); };
+          tx.onerror = () => { db.close(); reject(tx.error); };
+        };
+        req.onerror = () => reject(req.error);
+      });
+      show("out6", "✅ 已修复 " + targets.length + " 条食物的 catId。刷新 H5 页面看效果。");
+    } catch (e) {
+      show("out6", "ERR: " + e.message);
+    }
+  }
+</script>
+</body>
+</html>

@@ -43,6 +43,12 @@ cpSync(path.join(root, "assets"), path.join(client, "assets"), {
 cpSync(path.join(root, "utils"), path.join(client, "utils"), {
   recursive: true
 });
+// 诊断 / 调试工具页（如 data rescue）跟随 preview 一同 build，不参与主 H5 流程
+if (existsSync(path.join(root, "preview/_diag"))) {
+  cpSync(path.join(root, "preview/_diag"), path.join(client, "_diag"), {
+    recursive: true
+  });
+}
 
 for (const required of [
   "client/index.html",
