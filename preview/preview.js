@@ -804,6 +804,8 @@ function renderDiagPanel() {
         <pre class="diag-pre" data-diag-out="export">（点上面按钮开始）</pre>
         <button class="diag-btn diag-btn-danger" data-diag-action="fix">6. 把所有食物.catId 改成 meta.catId（修复漂移）</button>
         <pre class="diag-pre" data-diag-out="fix">（点上面按钮开始）</pre>
+        <button class="diag-btn" data-diag-action="cloudsync">7. 检查 SDK / cloudSync 状态（v1.1.2 调试）</button>
+        <pre class="diag-pre" data-diag-out="cloudsync">（点上面按钮开始）</pre>
       </div>
     </details>
   `;
