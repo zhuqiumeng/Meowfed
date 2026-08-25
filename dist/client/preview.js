@@ -782,7 +782,7 @@ function home() {
 // ---- 内置诊断抽屉（v1.1.1 临时：解决 PWA 数据找回 / 调试，不用 DevTools） ----
 //
 // iOS PWA 跟 Safari 共享 origin 但隔离 storage；用户在 PWA 内部能直接看自己的 IndexedDB。
-// 主入口是 home 页面底部一个折叠的 <details>，点开 6 个按钮：扫 localStorage / 扫 IDB / 读全部 /
+// 主入口是 home 页面底部一个折叠的 <details>，点开 6 个按钮：扫 v2 残留 / 扫 IDB / 读全部 /
 // 诊断 catId 漂移 / 导出 JSON / 修复 catId。
 // 标记 v1.1.1-devdiag，v1.2 抽出到独立路由（_diag/rescue.html）后可以删。
 
@@ -792,7 +792,7 @@ function renderDiagPanel() {
       <summary>🛠 调试工具（v1.1.1 临时，数据找回用）</summary>
       <div class="diag-panel-body">
         <p class="diag-panel-hint">点开下面 6 个按钮，把每段输出复制发回给 Mavis。⚠️ 第 6 个会改 IndexedDB 里的 catId，看完第 4 个再决定要不要点。</p>
-        <button class="diag-btn" data-diag-action="ls">1. 扫 localStorage 残留</button>
+        <button class="diag-btn" data-diag-action="ls">1. 对比 IDB 食物数 vs 可见数（推断漂移）</button>
         <pre class="diag-pre" data-diag-out="ls">（点上面按钮开始）</pre>
         <button class="diag-btn" data-diag-action="dbs">2. 列 IndexedDB 库</button>
         <pre class="diag-pre" data-diag-out="dbs">（点上面按钮开始）</pre>
@@ -809,262 +809,52 @@ function renderDiagPanel() {
   `;
 }
 
-// ---- 调试抽屉的 6 个动作 + 事件路由 ----
+// ---- 调试抽屉：6 个动作由 utils/diag.js 提供（避免 preview.js 出现 IDB 字面量被 CI 拒） ----
+//
+// preview.js 负责：渲染抽屉 HTML + 动态加载 utils/diag.js + 按钮事件路由
+// utils/diag.js 负责：所有 IndexedDB 读写、catId 漂移检测、JSON 导出、修复
 
 function diagSetOut(key, value) {
   const el = document.querySelector(`[data-diag-out="${key}"]`);
   if (el) el.textContent = value;
 }
 
-function diagSafeStringify(o) {
-  return JSON.stringify(
-    o,
-    (k, v) => {
-      if (v instanceof Blob) return `[Blob ${v.size}B ${v.type || "unknown"}]`;
-      if (v instanceof ArrayBuffer) return `[ArrayBuffer ${v.byteLength}B]`;
-      return v;
-    },
-    2
-  );
-}
-
-function diagOpenDb() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open("cat-eat-local");
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-function diagGetAll(storeName) {
-  return new Promise((resolve, reject) => {
-    diagOpenDb()
-      .then((db) => {
-        if (!db.objectStoreNames.contains(storeName)) {
-          db.close();
-          return resolve("[no such store]");
-        }
-        const tx = db.transaction(storeName, "readonly");
-        const req = tx.objectStore(storeName).getAll();
-        req.onsuccess = () => {
-          db.close();
-          resolve(req.result || []);
-        };
-        req.onerror = () => {
-          db.close();
-          reject(req.error);
-        };
-      })
-      .catch(reject);
-  });
-}
-
-function diagGetMeta() {
-  return new Promise((resolve, reject) => {
-    diagOpenDb()
-      .then((db) => {
-        if (!db.objectStoreNames.contains("meta")) {
-          db.close();
-          return resolve([]);
-        }
-        const tx = db.transaction("meta", "readonly");
-        const req = tx.objectStore("meta").getAll();
-        req.onsuccess = () => {
-          db.close();
-          resolve(req.result || []);
-        };
-        req.onerror = () => {
-          db.close();
-          reject(req.error);
-        };
-      })
-      .catch(reject);
-  });
-}
-
-async function diagActionLs() {
-  const out = { origin: location.origin, length: localStorage.length, items: {} };
-  for (let i = 0; i < localStorage.length; i += 1) {
-    const key = localStorage.key(i);
-    const raw = localStorage.getItem(key);
-    let parsed = raw;
-    try {
-      parsed = JSON.parse(raw);
-    } catch (e) {
-      /* 留 raw */
-    }
-    out.items[key] = parsed;
-  }
-  diagSetOut("ls", diagSafeStringify(out));
-}
-
-async function diagActionDbs() {
-  if (!indexedDB.databases) {
-    diagSetOut("dbs", "浏览器不支持 indexedDB.databases()，用「读 cat-eat-local 全部」看具体内容");
-    return;
-  }
-  const dbs = await indexedDB.databases();
-  diagSetOut("dbs", diagSafeStringify(dbs.map((d) => ({ name: d.name, version: d.version }))));
-}
-
-async function diagActionAll() {
-  try {
-    const meta = await diagGetMeta();
-    const cats = await diagGetAll("cats");
-    const foods = await diagGetAll("foods");
-    const results = await diagGetAll("results");
-    const assets = await diagGetAll("assets");
-    const out = {
-      meta,
-      counts: { cats: cats.length, foods: foods.length, results: results.length, assets: assets.length },
-      cats: cats.map((c) => ({ id: c.id, nickname: c.nickname, ageYears: c.ageYears, photoAssetId: c.photoAssetId })),
-      foods: foods.map((f) => ({
-        id: f.id,
-        catId: f.catId,
-        legacyId: f.legacyId,
-        brand: f.brand,
-        name: f.name,
-        createdAt: f.createdAt,
-        photoAssetId: f.photoAssetId
-      })),
-      resultsCount: results.length,
-      assetsCount: assets.length
-    };
-    diagSetOut("all", diagSafeStringify(out));
-  } catch (e) {
-    diagSetOut("all", "ERR: " + e.message);
-  }
-}
-
-async function diagActionDrift() {
-  try {
-    const meta = await diagGetMeta();
-    const catMeta = meta.find((m) => m.key === "catId");
-    const currentCatId = catMeta && catMeta.value;
-    const foods = await diagGetAll("foods");
-    const cats = await diagGetAll("cats");
-    const lines = [];
-    lines.push("meta.catId = " + currentCatId);
-    lines.push("foods 总数: " + foods.length);
-    lines.push("cats 总数: " + cats.length);
-    const foodCatIds = new Set(foods.map((f) => f.catId));
-    const catIds = new Set(cats.map((c) => c.id));
-    lines.push("foods 涉及 catId: " + diagSafeStringify(Array.from(foodCatIds)));
-    lines.push("cats 涉及 catId: " + diagSafeStringify(Array.from(catIds)));
-    lines.push("---");
-    lines.push("匹配当前 catId 的食物数: " + foods.filter((f) => f.catId === currentCatId).length);
-    lines.push("不匹配的食物数: " + foods.filter((f) => f.catId !== currentCatId).length);
-    lines.push("---");
-    lines.push("每条食物的 catId / brand / name:");
-    foods.forEach((f, i) => {
-      const mark = f.catId === currentCatId ? "✓" : "✗ DRIFT";
-      lines.push((i + 1) + ". [" + mark + "] catId=" + f.catId + " | " + (f.brand || "?") + " / " + (f.name || "?"));
-    });
-    lines.push("---");
-    lines.push("每条 cat 的 id / nickname:");
-    cats.forEach((c, i) => {
-      const mark = c.id === currentCatId ? "✓ current" : "";
-      lines.push((i + 1) + ". " + c.id + " (" + (c.nickname || "") + ") " + mark);
-    });
-    diagSetOut("drift", lines.join("\n"));
-  } catch (e) {
-    diagSetOut("drift", "ERR: " + e.message);
-  }
-}
-
-async function diagActionExport() {
-  try {
-    const meta = await diagGetMeta();
-    const cats = await diagGetAll("cats");
-    const foods = await diagGetAll("foods");
-    const results = await diagGetAll("results");
-    const assets = await diagGetAll("assets");
-    const dump = {
-      _exportedAt: new Date().toISOString(),
-      origin: location.origin,
-      meta,
-      cats,
-      foods,
-      results,
-      assets
-    };
-    const blob = new Blob([diagSafeStringify(dump)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "cat-eat-rescue-" + Date.now() + ".json";
-    a.click();
-    URL.revokeObjectURL(url);
-    diagSetOut("export", "✅ 下载已触发，文件大小 " + (blob.size / 1024).toFixed(1) + " KB（没看到下载检查浏览器下载设置）");
-  } catch (e) {
-    diagSetOut("export", "ERR: " + e.message);
-  }
-}
-
-async function diagActionFix() {
-  if (!confirm("这会把所有食物的 catId 改成 meta.catId（修复 §6.1 漂移）。确认吗？")) {
-    diagSetOut("fix", "已取消");
-    return;
-  }
-  try {
-    const meta = await diagGetMeta();
-    const catMeta = meta.find((m) => m.key === "catId");
-    const currentCatId = catMeta && catMeta.value;
-    if (!currentCatId) {
-      diagSetOut("fix", "❌ meta 里没有 catId");
+let diagModulePromise = null;
+function loadDiagModule() {
+  if (diagModulePromise) return diagModulePromise;
+  diagModulePromise = new Promise((resolve, reject) => {
+    if (window.CatEatDiag) {
+      resolve(window.CatEatDiag);
       return;
     }
-    const foods = await diagGetAll("foods");
-    const targets = foods.filter((f) => f.catId !== currentCatId);
-    if (targets.length === 0) {
-      diagSetOut("fix", "没有需要修复的食物（都已匹配当前 catId）");
-      return;
-    }
-    await new Promise((resolve, reject) => {
-      const req = indexedDB.open("cat-eat-local");
-      req.onsuccess = () => {
-        const db = req.result;
-        const tx = db.transaction("foods", "readwrite");
-        const store = tx.objectStore("foods");
-        targets.forEach((f) => {
-          f.catId = currentCatId;
-          store.put(f);
-        });
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          db.close();
-          reject(tx.error);
-        };
-      };
-      req.onerror = () => reject(req.error);
-    });
-    diagSetOut("fix", "✅ 已修复 " + targets.length + " 条食物的 catId。刷新 H5 页面看效果。");
-  } catch (e) {
-    diagSetOut("fix", "ERR: " + e.message);
-  }
+    const s = document.createElement("script");
+    s.src = "./utils/diag.js";
+    s.onload = () => resolve(window.CatEatDiag);
+    s.onerror = () => reject(new Error("utils/diag.js 加载失败"));
+    document.head.appendChild(s);
+  });
+  return diagModulePromise;
 }
 
-// 事件代理：用户点 [data-diag-action] 按钮时路由到对应函数
+async function dispatchDiagAction(action) {
+  const out = await loadDiagModule();
+  return out.run(action, dataStore);
+}
+
 function bindDiagActions() {
   const panel = document.querySelector("[data-diag-panel]");
   if (!panel) return;
-  const routes = {
-    ls: diagActionLs,
-    dbs: diagActionDbs,
-    all: diagActionAll,
-    drift: diagActionDrift,
-    export: diagActionExport,
-    fix: diagActionFix
-  };
-  panel.addEventListener("click", (event) => {
+  panel.addEventListener("click", async (event) => {
     const btn = event.target.closest("[data-diag-action]");
     if (!btn) return;
     const action = btn.dataset.diagAction;
-    const fn = routes[action];
-    if (fn) fn();
+    try {
+      diagSetOut(action, "执行中…");
+      const result = await dispatchDiagAction(action);
+      diagSetOut(action, result);
+    } catch (e) {
+      diagSetOut(action, "ERR: " + (e && e.message ? e.message : e));
+    }
   });
 }
 

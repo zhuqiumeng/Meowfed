@@ -6002,13 +6002,13 @@ html[data-mobile-keyboard-mode="overlay"] .bottom-nav {
   background: rgba(255, 255, 255, 0.92);
   border: 1px dashed #c4c4c4;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: var(--type-body-size);
   color: #555;
 }
 
 .diag-panel > summary {
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--type-weight-semibold);
   color: #8a6d3b;
   user-select: none;
   list-style: none;
@@ -6026,7 +6026,7 @@ html[data-mobile-keyboard-mode="overlay"] .bottom-nav {
 }
 
 .diag-panel-hint {
-  font-size: 12px;
+  font-size: var(--type-meta-size);
   color: #888;
   margin: 0 0 4px;
   line-height: 1.5;
@@ -6038,7 +6038,7 @@ html[data-mobile-keyboard-mode="overlay"] .bottom-nav {
   background: #fff;
   border-radius: 8px;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--type-body-size);
   color: #333;
   text-align: left;
   cursor: pointer;
@@ -6053,7 +6053,7 @@ html[data-mobile-keyboard-mode="overlay"] .bottom-nav {
   color: #d4d4d4;
   padding: 8px 10px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: var(--type-label-size);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   white-space: pre-wrap;
   word-break: break-all;
