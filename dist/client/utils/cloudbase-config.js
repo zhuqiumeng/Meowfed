@@ -38,6 +38,10 @@
 
   function readWindowDefault() {
     if (!globalScope) return null;
+    // 只在浏览器环境（globalScope.document 存在）启用 default env；
+    // Node test 环境无 document，避免 cloudSync 启动后 setInterval 网络重试
+    // 让 test runner 不退出。
+    if (!globalScope.document) return null;
     return globalScope.__CLOUDBASE_DEFAULT_ENV__ || DEFAULT_ENV;
   }
 
