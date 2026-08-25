@@ -864,48 +864,31 @@ function renderCloudSyncCard() {
   // SDK 完全没加载 → 不显示（云同步能力不可用）
   if (!dataStore.isCloudBaseSdkAvailable()) return "";
 
-  // SDK 已加载但 env 未配 → 显示输入卡片，引导用户开启云同步
-  if (!dataStore.isCloudBaseConfigured()) {
-    return `
-      <section class="home-cloud-card" aria-label="云同步设置">
-        <header class="home-cloud-head">
-          <h3>云同步</h3>
-          <span class="home-cloud-status">未启用</span>
-        </header>
-        <p class="home-cloud-meta">填入 CloudBase 环境 ID，把数据备份到云端。ID 会保存在本地，下次启动自动启用。</p>
-        <form class="home-cloud-form" data-cloud-form>
-          <label class="home-cloud-form-label" for="cloud-env-input">CloudBase 环境 ID</label>
-          <input
-            id="cloud-env-input"
-            class="home-cloud-input"
-            name="cloudEnv"
-            type="text"
-            placeholder="例如：cat-eat-prod-xxxxxx"
-            autocomplete="off"
-            inputmode="text"
-            enterkeyhint="done"
-            data-mobile-keyboard
-          />
-          <button type="submit" class="cloud-button">保存并启用</button>
-        </form>
-      </section>
-    `;
-  }
-
-  // env 已配 → 完整卡片
+  // v1.1.2：env ID 有 hardcoded default，永远 resolve 成功。
+  // UI 改成「状态显示 + 主动操作按钮」，不再有「填 env ID」onboarding。
+  // 启动时 data-store 已自动 cloudSync.start()，user 几乎无感。
   const cs = dataStore.cloudSync;
   if (!cs) return "";
   const state = cs.getState();
   const phaseLabel = {
-    idle: "未连接",
+    idle: "准备中…",
     connecting: "连接中…",
-    ready: "已就绪",
+    ready: "已同步",
     syncing: "同步中…",
     error: "同步出错"
   }[state.phase] || state.phase;
   const lastSync = state.lastSyncAt
     ? new Date(state.lastSyncAt).toLocaleString("zh-CN", { hour12: false })
     : "—";
+  // 友好提示文案随状态变
+  let hint = "数据自动备份到云端，无需手动操作。";
+  if (state.phase === "error") {
+    hint = "网络或权限问题，重试或检查调试工具。";
+  } else if (state.phase === "connecting" || state.phase === "idle") {
+    hint = "首次连接中，约 2-5 秒。";
+  } else if (state.phase === "ready") {
+    hint = "数据自动备份到云端。换设备登录同一账号可同步。";
+  }
   return `
     <section class="home-cloud-card" aria-label="云同步">
       <header class="home-cloud-head">
@@ -913,11 +896,11 @@ function renderCloudSyncCard() {
         <span class="home-cloud-status" data-cloud-phase="${state.phase}">${escapeHtml(phaseLabel)}</span>
       </header>
       <p class="home-cloud-meta">最近一次同步：${escapeHtml(lastSync)}</p>
+      <p class="home-cloud-hint">${escapeHtml(hint)}</p>
       ${state.error ? `<p class="home-cloud-error">${escapeHtml(state.error)}</p>` : ""}
       <div class="home-cloud-actions">
-        <button type="button" class="cloud-button" data-cloud-action="push">首次上传到云</button>
+        <button type="button" class="cloud-button" data-cloud-action="push">立即上传到云</button>
         <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="pull">从云恢复</button>
-        <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="sync-assets">同步照片</button>
         <button type="button" class="cloud-button cloud-button-secondary home-cloud-disconnect" data-cloud-action="disconnect">断开</button>
       </div>
     </section>
@@ -2535,16 +2518,8 @@ function bindEvents() {
           } else {
             showToast(`恢复失败：${result.error}`);
           }
-        } else if (action === "sync-assets") {
-          if (!dataStore.cloudSync) return;
-          const result = await dataStore.cloudSync.syncAssetsToCloud();
-          if (result.uploaded > 0 || result.skipped > 0) {
-            showToast(`已上传 ${result.uploaded} 张，跳过 ${result.skipped} 张`);
-          } else {
-            showToast("没有需要同步的照片");
-          }
         } else if (action === "disconnect") {
-          if (!confirm("确定要断开云同步吗？\n本地数据会保留，下次输入环境 ID 可重新连接。")) return;
+          if (!confirm("确定要断开云同步吗？\n本地数据会保留，重新连接后会继续自动备份。")) return;
           dataStore.setCloudBaseEnv("");
           showToast("已断开云同步");
           render();
@@ -2554,31 +2529,6 @@ function bindEvents() {
       }
     });
   });
-
-  // 云同步 env 输入表单
-  const cloudForm = document.querySelector("[data-cloud-form]");
-  if (cloudForm) {
-    cloudForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const dataStore = window.CatEatData;
-      if (!dataStore) return;
-      const formData = new FormData(cloudForm);
-      const env = String(formData.get("cloudEnv") || "").trim();
-      if (!env) {
-        showToast("请输入 CloudBase 环境 ID");
-        return;
-      }
-      // 简单合法性：CloudBase env ID 是字母数字和 dash 组成
-      if (!/^[a-zA-Z0-9-]{4,40}$/.test(env)) {
-        showToast("环境 ID 格式看起来不对，请检查后重试");
-        return;
-      }
-      dataStore.setCloudBaseEnv(env);
-      showToast("已保存，刷新页面后启用云同步");
-      // 刷新页面让 DataService 重新初始化（拿取 cloudSync 实例）
-      setTimeout(() => location.reload(), 600);
-    });
-  }
 
   const photoInput = document.querySelector("#photo-input");
   photoInput?.addEventListener("change", async () => {

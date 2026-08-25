@@ -5920,9 +5920,16 @@ html[data-mobile-keyboard-mode="overlay"] .bottom-nav {
 }
 
 .home-cloud-meta {
-  margin: 0 0 10px;
+  margin: 0 0 6px;
   font-size: var(--type-meta-size);
   color: var(--ink-3, #6b6f80);
+}
+
+.home-cloud-hint {
+  margin: 0 0 10px;
+  font-size: var(--type-label-size);
+  color: var(--ink-3, #6b6f80);
+  opacity: 0.85;
 }
 
 .home-cloud-error {
