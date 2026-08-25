@@ -26,9 +26,19 @@
   const STORAGE_KEY = "cat-eat-cloudbase-env";
   const PERSISTED_FLAG = "cat-eat-cloudbase-persisted";
 
+  // v1.1.2：env ID 内置 fallback，构建脚本可以覆盖（window.__CLOUDBASE_DEFAULT_ENV__）
+  // 这样「填 env ID」是 dev 工具而不是 user onboarding 流程。
+  // 上线时用 meowfed-d8bc79bfpabac02b3；后续多环境可改成 prod / staging。
+  const DEFAULT_ENV = "meowfed-d8bc79bfpabac02b3";
+
   function readWindowEnv() {
     if (!globalScope) return null;
     return globalScope.__CLOUDBASE_ENV__ || null;
+  }
+
+  function readWindowDefault() {
+    if (!globalScope) return null;
+    return globalScope.__CLOUDBASE_DEFAULT_ENV__ || DEFAULT_ENV;
   }
 
   function readStorageEnv() {
@@ -64,12 +74,14 @@
 
   return {
     STORAGE_KEY,
+    DEFAULT_ENV,
     isConfigured(env) {
       if (env) return true;
-      return Boolean(readWindowEnv() || readStorageEnv());
+      return Boolean(readWindowEnv() || readStorageEnv() || readWindowDefault());
     },
     getEnv() {
-      return readWindowEnv() || readStorageEnv() || null;
+      // 优先级：user 主动设置 > window override > hardcoded default
+      return readStorageEnv() || readWindowEnv() || readWindowDefault();
     },
     setEnv(env) {
       writeStorageEnv(env);
@@ -77,7 +89,7 @@
     clearEnv() {
       clearStorageEnv();
     },
-    // 给 UI 用的：用户可填入 env ID，保存后下次启动自动启用
+    // user 是否在 UI 里改过 env（区分「默认」和「user 主动设置」）
     isPersistedByUser() {
       try {
         if (globalScope && globalScope.localStorage) {
@@ -87,6 +99,10 @@
         // ignore
       }
       return false;
+    },
+    // 当前实际生效的 env 是否来自 user 主动设置（不是 default）
+    isEnvFromUser() {
+      return Boolean(readStorageEnv());
     }
   };
 });
