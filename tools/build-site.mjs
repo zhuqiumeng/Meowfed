@@ -43,6 +43,20 @@ cpSync(path.join(root, "assets"), path.join(client, "assets"), {
 cpSync(path.join(root, "utils"), path.join(client, "utils"), {
   recursive: true
 });
+// v1.1.2：把 @cloudbase/js-sdk 打成 IIFE bundle 放到 dist，
+// 让 H5 页面能通过 <script src="./utils/cloudbase-sdk.js"> 挂到 globalThis.cloudbase。
+// 之前 SDK 只能在 Node 端 require，H5 实际拿不到，云同步卡片永远不渲染。
+const { build: esbuild } = await import("esbuild");
+await esbuild({
+  entryPoints: [path.join(root, "node_modules/@cloudbase/js-sdk/dist/index.cjs.js")],
+  bundle: true,
+  format: "iife",
+  globalName: "cloudbase",
+  target: "es2018",
+  minify: true,
+  outfile: path.join(client, "utils/cloudbase-sdk.js"),
+  logLevel: "silent"
+});
 // 诊断 / 调试工具页（如 data rescue）跟随 preview 一同 build，不参与主 H5 流程
 if (existsSync(path.join(root, "preview/_diag"))) {
   cpSync(path.join(root, "preview/_diag"), path.join(client, "_diag"), {
