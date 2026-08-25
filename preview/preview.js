@@ -861,29 +861,30 @@ function bindDiagActions() {
 function renderCloudSyncCard() {
   const dataStore = window.CatEatData;
   if (!dataStore) return "";
-  // SDK 完全没加载 → 不显示（云同步能力不可用）
-  if (!dataStore.isCloudBaseSdkAvailable()) return "";
 
-  // v1.1.2：env ID 有 hardcoded default，永远 resolve 成功。
-  // UI 改成「状态显示 + 主动操作按钮」，不再有「填 env ID」onboarding。
-  // 启动时 data-store 已自动 cloudSync.start()，user 几乎无感。
+  // v1.1.2：env ID 有 hardcoded default，UI 改成「状态显示 + 主动操作按钮」，
+  // 不再有「填 env ID」onboarding。启动时 data-store 已自动 cloudSync.start()。
+  // SDK 未加载 / cloudSync 不可用时显示诊断信息，方便排查。
+  const sdkReady = dataStore.isCloudBaseSdkAvailable();
   const cs = dataStore.cloudSync;
-  if (!cs) return "";
-  const state = cs.getState();
+  const state = cs ? cs.getState() : { phase: sdkReady ? "error" : "no-sdk", error: sdkReady ? "云端连接初始化失败" : "CloudBase SDK 未加载" };
   const phaseLabel = {
+    "no-sdk": "未配置",
     idle: "准备中…",
     connecting: "连接中…",
     ready: "已同步",
     syncing: "同步中…",
-    error: "同步出错"
+    error: "连接出错"
   }[state.phase] || state.phase;
   const lastSync = state.lastSyncAt
     ? new Date(state.lastSyncAt).toLocaleString("zh-CN", { hour12: false })
     : "—";
   // 友好提示文案随状态变
   let hint = "数据自动备份到云端，无需手动操作。";
-  if (state.phase === "error") {
-    hint = "网络或权限问题，重试或检查调试工具。";
+  if (state.phase === "no-sdk") {
+    hint = "SDK 加载失败，刷新页面或检查网络。";
+  } else if (state.phase === "error") {
+    hint = state.error || "网络或权限问题，重试或检查调试工具。";
   } else if (state.phase === "connecting" || state.phase === "idle") {
     hint = "首次连接中，约 2-5 秒。";
   } else if (state.phase === "ready") {
@@ -897,12 +898,13 @@ function renderCloudSyncCard() {
       </header>
       <p class="home-cloud-meta">最近一次同步：${escapeHtml(lastSync)}</p>
       <p class="home-cloud-hint">${escapeHtml(hint)}</p>
-      ${state.error ? `<p class="home-cloud-error">${escapeHtml(state.error)}</p>` : ""}
+      ${cs ? `
       <div class="home-cloud-actions">
         <button type="button" class="cloud-button" data-cloud-action="push">立即上传到云</button>
         <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="pull">从云恢复</button>
         <button type="button" class="cloud-button cloud-button-secondary home-cloud-disconnect" data-cloud-action="disconnect">断开</button>
       </div>
+      ` : `<div class="home-cloud-actions"><button type="button" class="cloud-button" data-cloud-action="retry">重试</button></div>`}
     </section>
   `;
 }
@@ -2523,6 +2525,9 @@ function bindEvents() {
           dataStore.setCloudBaseEnv("");
           showToast("已断开云同步");
           render();
+        } else if (action === "retry") {
+          // SDK 或 cloudSync 没初始化好，刷新页面重新加载
+          window.location.reload();
         }
       } catch (error) {
         showToast(`操作失败：${error.message || error}`);
