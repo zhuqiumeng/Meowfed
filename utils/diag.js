@@ -267,16 +267,26 @@
   };
 
   async function actionCloudSync(_unused, dataStore) {
-    if (!dataStore) return "CatEatData 不可用";
+    // 优先用参数；如果参数是 null/undefined（preview.js 闭包 timing 问题），
+    // 回退读 window.CatEatData，确保诊断信息不依赖闭包。
+    const ds = dataStore || (typeof globalThis !== "undefined" && globalThis.CatEatData) || null;
+    if (!ds) {
+      return safeStringify({
+        paramDataStore: typeof dataStore,
+        paramDataStoreKeys: dataStore ? Object.keys(dataStore).slice(0, 5) : null,
+        globalCatEatData: typeof globalThis !== "undefined" ? typeof globalThis.CatEatData : "no-global",
+        globalCatEatDataKeys: globalThis.CatEatData ? Object.keys(globalThis.CatEatData).slice(0, 5) : null
+      });
+    }
     const out = {
-      sdkAvailable: typeof dataStore.isCloudBaseSdkAvailable === "function" ? dataStore.isCloudBaseSdkAvailable() : "no-method",
-      sdkConfigured: typeof dataStore.isCloudBaseConfigured === "function" ? dataStore.isCloudBaseConfigured() : "no-method",
-      getCloudBaseEnv: typeof dataStore.getCloudBaseEnv === "function" ? dataStore.getCloudBaseEnv() : "no-method",
-      cloudSyncExists: !!dataStore.cloudSync,
+      sdkAvailable: typeof ds.isCloudBaseSdkAvailable === "function" ? ds.isCloudBaseSdkAvailable() : "no-method",
+      sdkConfigured: typeof ds.isCloudBaseConfigured === "function" ? ds.isCloudBaseConfigured() : "no-method",
+      getCloudBaseEnv: typeof ds.getCloudBaseEnv === "function" ? ds.getCloudBaseEnv() : "no-method",
+      cloudSyncExists: !!ds.cloudSync,
       globalCloudbase: typeof globalThis.cloudbase,
       globalCloudbaseKeys: globalThis.cloudbase ? Object.keys(globalThis.cloudbase).slice(0, 10) : null
     };
-    if (dataStore.cloudSync && typeof dataStore.cloudSync.getState === "function") {
+    if (ds.cloudSync && typeof ds.cloudSync.getState === "function") {
       out.cloudSyncState = dataStore.cloudSync.getState();
     }
     return safeStringify(out);
