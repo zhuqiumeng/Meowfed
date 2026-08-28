@@ -284,7 +284,13 @@
       getCloudBaseEnv: typeof ds.getCloudBaseEnv === "function" ? ds.getCloudBaseEnv() : "no-method",
       cloudSyncExists: !!ds.cloudSync,
       globalCloudbase: typeof globalThis.cloudbase,
-      globalCloudbaseKeys: globalThis.cloudbase ? Object.keys(globalThis.cloudbase).slice(0, 10) : null
+      globalCloudbaseKeys: globalThis.cloudbase ? Object.keys(globalThis.cloudbase).slice(0, 10) : null,
+      globalCloudBaseConfig: typeof globalThis.CatEatCloudBaseConfig,
+      configGetEnv: globalThis.CatEatCloudBaseConfig ? globalThis.CatEatCloudBaseConfig.getEnv() : "no-config",
+      configDefaultEnv: globalThis.CatEatCloudBaseConfig ? globalThis.CatEatCloudBaseConfig.DEFAULT_ENV : "no-config",
+      typeofRequire: typeof require,
+      typeofDocument: typeof document,
+      globalThisKeys: Object.keys(globalThis).filter(k => k.startsWith("CatEat") || k.startsWith("__CLOUDBASE"))
     };
     if (ds.cloudSync && typeof ds.cloudSync.getState === "function") {
       out.cloudSyncState = dataStore.cloudSync.getState();
@@ -297,6 +303,14 @@
       const fn = routes[action];
       if (!fn) return Promise.resolve("未知动作: " + action);
       return fn(dataStore);
+    },
+    setEnv(env) {
+      // v1.1.2 调试用：让 dev 把正确的 env 写到 localStorage，覆盖 hardcoded default
+      if (globalScope.CatEatCloudBaseConfig) {
+        globalScope.CatEatCloudBaseConfig.setEnv(env);
+        return "已保存。刷新页面生效。";
+      }
+      return "CloudBaseConfig 不可用";
     },
     routes
   };

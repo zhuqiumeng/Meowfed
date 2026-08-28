@@ -28,8 +28,9 @@
 
   // v1.1.2：env ID 内置 fallback，构建脚本可以覆盖（window.__CLOUDBASE_DEFAULT_ENV__）
   // 这样「填 env ID」是 dev 工具而不是 user onboarding 流程。
-  // 上线时用 meowfed-d8bc79bfpabac02b3；后续多环境可改成 prod / staging。
-  const DEFAULT_ENV = "meowfed-d8bc79bfpabac02b3";
+  // 上线时用 meowfed-d8gc79bfpabac02b3（user 在 CloudBase 控制台确认的环境）；
+  // 后续多环境可改成 prod / staging。
+  const DEFAULT_ENV = "meowfed-d8gc79bfpabac02b3";
 
   function readWindowEnv() {
     if (!globalScope) return null;

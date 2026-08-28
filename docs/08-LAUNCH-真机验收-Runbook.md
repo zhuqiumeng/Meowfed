@@ -58,7 +58,7 @@ npm run build:site    # 期望：Sites build ready
 ## 3. 5 步连通性诊断（任一步失败时跑）
 
 ```bash
-node tests/cloudbase-live-diag.js meowfed-d8bc79bfpabac02b3
+node tests/cloudbase-live-diag.js meowfed-d8gc79bfpabac02b3
 ```
 
 按提示输出针对每步失败的解决建议。覆盖：
