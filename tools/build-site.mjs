@@ -57,6 +57,25 @@ await esbuild({
   outfile: path.join(client, "utils/cloudbase-sdk.js"),
   logLevel: "silent"
 });
+// v1.1.2-fix：把 utils/data-store.js 也打成 IIFE bundle，自动 inline
+// cloudbase-adapter / cloud-repository / outbox / sync-repository / cloud-sync 五个
+// 业务模块到 globalThis（CatEatCloudBaseAdapter / CatEatCloudRepository /
+// CatEatOutbox / CatEatSyncRepository / CatEatCloudSync）。
+// 之前这些只在 Node 端 require，H5 拿不到 → cloudSync 实例永远 null →
+// 卡片显示"未配置"。esbuild --format=iife 让 data-store.js 在浏览器里能
+// 完整跑通 CloudBase bootstrap 链路。
+// SDK 标记为 external：data-store 引用 globalThis.cloudbase（由前面的
+// cloudbase-sdk.js IIFE 挂上），不重复 inline 931KB。
+await esbuild({
+  entryPoints: [path.join(root, "utils/data-store.js")],
+  bundle: true,
+  format: "iife",
+  target: "es2018",
+  minify: true,
+  external: ["@cloudbase/js-sdk"],
+  outfile: path.join(client, "utils/data-store.js"),
+  logLevel: "silent"
+});
 // 诊断 / 调试工具页（如 data rescue）跟随 preview 一同 build，不参与主 H5 流程
 if (existsSync(path.join(root, "preview/_diag"))) {
   cpSync(path.join(root, "preview/_diag"), path.join(client, "_diag"), {

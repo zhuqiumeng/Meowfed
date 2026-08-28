@@ -22,11 +22,33 @@ const server = http.createServer((request, response) => {
     "/preview.js": "preview/preview.js"
   };
   const relativePath = previewFiles[requestPath] || requestPath.replace(/^\/+/, "");
+
+  // v1.1.2：dist 路径（build 出的 IIFE bundle + SDK）优先；source 作为 fallback。
+  // 这样 build 后能立即用本地 server 验证，不用先 git commit。
+  const distRoot = path.join(root, "dist", "client");
+  const distFilePath = path.join(distRoot, relativePath);
   const filePath = path.join(root, relativePath);
 
-  if (!filePath.startsWith(root)) {
+  if (!filePath.startsWith(root) && !distFilePath.startsWith(distRoot)) {
     response.writeHead(403);
     response.end("Forbidden");
+    return;
+  }
+
+  // 先查 dist（build 产物）；找不到再查 source
+  if (distFilePath.startsWith(distRoot) && fs.existsSync(distFilePath)) {
+    fs.readFile(distFilePath, (error, content) => {
+      if (error) {
+        response.writeHead(404);
+        response.end("Not found");
+        return;
+      }
+      response.writeHead(200, {
+        "Content-Type": contentTypes[path.extname(distFilePath)] || "application/octet-stream",
+        "Cache-Control": "no-store"
+      });
+      response.end(content);
+    });
     return;
   }
 
@@ -36,7 +58,6 @@ const server = http.createServer((request, response) => {
       response.end("Not found");
       return;
     }
-
     response.writeHead(200, {
       "Content-Type": contentTypes[path.extname(filePath)] || "application/octet-stream",
       "Cache-Control": "no-store"
