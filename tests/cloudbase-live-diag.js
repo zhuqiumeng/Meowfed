@@ -40,11 +40,17 @@ function fail(msg) {
     let auth;
     try {
       auth = await app.auth().signInAnonymously();
-      // 真实 SDK：返回 { user: { openId }, openId }
-      openid = auth.openId || (auth.user && auth.user.openId);
+      // v1.1.2：SDK 3.8 返回结构是 { user: { id, ... } }，老版本是 { openId }
+      // 兼容两种 + 从 .data.user.id 取
+      openid =
+        auth?.user?.id ||
+        auth?.openId ||
+        auth?.data?.user?.id ||
+        (auth?.user && auth.user.openId);
       if (!openid) {
         fail("sign-in returned but no openid found in result");
-        console.log("    result =", JSON.stringify(auth));
+        console.log("    result top-level keys =", Object.keys(auth || {}));
+        if (auth && auth.user) console.log("    auth.user keys =", Object.keys(auth.user));
         return;
       }
       ok(`signed in, openid = ${openid}`);
