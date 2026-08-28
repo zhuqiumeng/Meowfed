@@ -289,6 +289,12 @@
   //     pushFirstTime / pullFromCloud / 资源同步
 
   function getCloudBaseConfig() {
+    // v1.1.2-fix：浏览器优先。esbuild bundle 时会注入 require shim，
+    // 如果不先看 globalThis，require 抛错会立即 return null，错过
+    // ./utils/cloudbase-config.js IIFE 挂的 globalThis.CatEatCloudBaseConfig。
+    if (globalThis && globalThis.CatEatCloudBaseConfig) {
+      return globalThis.CatEatCloudBaseConfig;
+    }
     if (typeof require === "function") {
       try {
         const mod = require("./cloudbase-config");
@@ -297,22 +303,23 @@
         return null;
       }
     }
-    if (globalThis.CatEatCloudBaseConfig) {
-      return globalThis.CatEatCloudBaseConfig;
-    }
     return null;
   }
 
   function loadCloudBaseSDK() {
+    // v1.1.2-fix：浏览器优先。esbuild bundle data-store.js 时会注入 require
+    // shim，让 `typeof require === "function"` 在浏览器里也是 true，
+    // 如果不先看 globalThis，require 抛错会立即 return null，不再 fall
+    // through 到 globalThis.cloudbase（由 ./utils/cloudbase-sdk.js IIFE 挂上）。
+    if (globalThis && globalThis.cloudbase) {
+      return globalThis.cloudbase;
+    }
     if (typeof require === "function") {
       try {
         return require("@cloudbase/js-sdk");
       } catch (error) {
         return null;
       }
-    }
-    if (globalThis.cloudbase) {
-      return globalThis.cloudbase;
     }
     return null;
   }
