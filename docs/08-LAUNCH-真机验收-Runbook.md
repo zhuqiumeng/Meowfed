@@ -33,25 +33,40 @@ npm run build:site    # 期望：Sites build ready
 
 ---
 
-## 2. iPhone 真机验收（11 步）
+## 2. iPhone 真机验收（v1.1.3 急用版 · 5 步）
 
-> 准备：iPhone Safari 打开 https://zhuqiumeng.github.io/Meowfed/，先添加 2-3 条食物再走云同步测试。
+> **背景**：真 CloudBase env (`meowfed-d8gc79bfpabac02b3`) 是 PostgreSQL 实例，
+> **没有 mongodb collection**。SDK 写库会静默失败（之前的 5 步 diag 报告"全过"
+> 实际是 4 步 + 1 步静默报错），user 看着本地有数据但云端没有 = 数据丢失。
+>
+> **v1.1.3 急用版策略**：默认关闭云同步，主页面新增「导出 / 导入 JSON 备份」
+> 作为「数据不丢」的实操方案（v1.2 邮箱同步迁到 PG schema 后再恢复云同步）。
+
+准备：iPhone Safari / PWA 打开 https://zhuqiumeng.github.io/Meowfed/。
 
 | # | 操作 | 预期 |
 | --- | --- | --- |
 | 1 | 添加 2-3 条食物（含 1 张照片） | 数据进 IndexedDB；首页「最近记录」显示卡片 |
-| 2 | 滚到首页底部，看到「云同步」卡片 | 显示「未启用」+ 输入框 |
-| 3 | 输入 env ID → 保存 | Toast「已保存，刷新页面后启用云同步」→ 自动刷新 |
-| 4 | 刷新后看到云同步卡片 | 显示「已就绪」+ 3 个动作按钮（首次上传 / 从云恢复 / 断开） |
-| 5 | 点「首次上传到云」 | Toast「已上传 N 条食物」；卡片显示最近同步时间 |
-| 6 | 进 CloudBase 控制台 → 数据库 → `foods` collection | 能看到对应记录（无 blob 字段，photoAssetId 是云文件 ID） |
-| 7 | 在另一台设备 / Safari 隐身窗口打开同一 H5，输入相同 env ID | 自动 sync 启动 |
-| 8 | 在 B 设备点「从云恢复」 | Toast「已从云端恢复」；B 设备看到与 A 相同的食物列表 + 缩略图 |
-| 9 | 关闭网络（飞行模式） | UI 不受影响，所有读写继续走本地 |
-| 10 | 恢复网络后下一次写 | 自动 push（无需手动操作） |
-| 11 | 点「断开」确认 | 卡片回到「未启用」状态；数据保留在本地 |
+| 2 | 滚到首页底部，看「云同步」卡片 | 状态显示「本地模式」+ 4 个按钮：「导出 JSON 备份 / 导入 JSON 恢复 / 开启云同步 / 调试工具」 |
+| 3 | 点「导出 JSON 备份」 | iOS 弹「下载 / 保存到文件」→ 选「存储到文件」→ 存到 iCloud Drive 或「下载」目录（文件名形如 `cat-eat-rescue-1788xxx.json`） |
+| 4 | 长按这个文件 → 分享给「微信文件传输助手」或发邮件给自己 | 备份文件已离开手机，到达 icloud / 微信 / 邮箱 |
+| 5 | （重装 / 换机 / 微信找回）从微信/iCloud 把 JSON 文件下载回 iPhone → 在 PWA 内点「导入 JSON 恢复」选这个文件 → 确认覆盖 → 看到食物列表全部回来 | 5 个 collection（meta/cats/foods/results/assets，含 blob 资产）全量恢复 |
 
-**已知限制（v1.1.1）**：见 [07 §6](./07-DATA-数据层迁移-CloudBase-MVP.md#6-已知限制v2-跟进项)。
+**为什么是这 5 步**：iOS PWA 7-day eviction 风险 + iPhone 存储空间满清 web 存储，
+> 都会让本地 IndexedDB 静默丢。手动 JSON 备份是 v1.1.3 阶段唯一能跨设备/跨
+> 重装/跨 time 复活的方案。v1.2 邮箱同步上线后，导入/导出退化为「跨设备兜底」。
+
+## 2.5 iPhone 真机验收（v1.2 云同步 · 11 步 · TODO）
+
+> v1.2 邮箱账号体系 + PostgreSQL 数据层迁移上线后，才回到这条验收。
+> v1.1.3 阶段以 §2 5 步为准。
+
+**已知限制（v1.1.3）**：见 [07 §6](./07-DATA-数据层迁移-CloudBase-MVP.md#6-已知限制v2-跟进项)。
+新增：
+
+- v1.1.3 云同步默认关闭；user 需在主页面主动点「开启云同步」（opt-in）才会真连 CloudBase
+- 即使开启，当前 PostgreSQL env 仍无 mongodb collection，云端 foods/results/assets 写入会静默失败（v1.2 修）
+- 资产（照片）走 CloudBase 云存储目前可用（v1.1.3 commit 57eeb51 修了 SDK `storage.from()` 路径，bucket = `cat-eat-assets-001`）
 
 ---
 
