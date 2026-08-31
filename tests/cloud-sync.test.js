@@ -127,12 +127,12 @@ test("syncAssetsToCloud 上传本地 blob 到云存储 + 更新 asset 记录", a
 
   // 本地 asset 记录被更新：保留 cloudPath，blob 置 null
   const localAsset = await local.find("assets", "asset-1");
-  assert.match(localAsset.cloudPath, /^cat-eat-assets\/openid-/);
+  assert.match(localAsset.cloudPath, /^cat-eat-assets-001\/openid-/);
   assert.equal(localAsset.blob, null);
 
   // 云端 asset 记录也存在（blob 字段在 push 时被剥离）
   const cloudAsset = await cloud.find("assets", "asset-1");
-  assert.match(cloudAsset.cloudPath, /^cat-eat-assets\/openid-/);
+  assert.match(cloudAsset.cloudPath, /^cat-eat-assets-001\/openid-/);
   assert.ok(cloudAsset.blob === undefined || cloudAsset.blob === null);
 });
 
@@ -252,7 +252,7 @@ test("pushFirstTime 含 blob asset：云 DB 记录无 blob 字段（顺序倒置
   const cloudAsset = await cloud.find("assets", "asset-1");
   assert.ok(cloudAsset);
   assert.ok(!cloudAsset.blob, `blob should be stripped, got ${cloudAsset.blob}`);
-  assert.match(cloudAsset.cloudPath, /^cat-eat-assets\//);
+  assert.match(cloudAsset.cloudPath, /^cat-eat-assets-001\//);
   assert.ok(cloudAsset.cloudFileID);
 });
 

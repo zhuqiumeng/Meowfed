@@ -35,9 +35,12 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
   }
 
   const db = app.database();
-  // v1.1.2: CloudBase 存储桶名，由 user 在 console 实际创建决定（v1.1.2 修包确认
-  // 桶名 = "meowfed-assets"，跟 docs/07 §6.5 描述一致；原默认 "cat-eat-assets" 是占位）。
-  const STORAGE_ROOT = storageRoot || "meowfed-assets";
+  // v1.1.3: CloudBase 存储桶名 = user 在新版 dev 平台 (tcb.cloud.tencent.com/dev)
+  // 真创建的真实桶名。控制台旧版 UI 显示 `6d65-...` 是渲染占位，listBuckets
+  // API 不返回这个 bucket（SDK 3.x 旧/新路径不一致）——但 upload 走
+  // `app.storage.from(BUCKET).upload(name, content)` 实际能通。
+  // 注意：换 env 时这里要同步改（user 引 dev/prod env 时改一份即可）。
+  const STORAGE_ROOT = storageRoot || "cat-eat-assets-001";
   const STORAGE_BATCH = 100; // CloudBase 单次删除 fileList 上限
 
   // ---- Auth ----
@@ -62,13 +65,13 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
     }
     try {
       const result = await auth.signInAnonymously();
+      // v1.1.3: SDK 3.x 实际返回 { user: { id, ... } } / { openId } 两种格式
       if (result && result.openId) {
         _openid = result.openId;
         return _openid;
       }
-      // signInAnonymously 可能返回 user 对象
-      if (result && result.user && result.user.openId) {
-        _openid = result.user.openId;
+      if (result && result.user && (result.user.openId || result.user.id)) {
+        _openid = result.user.openId || result.user.id;
         return _openid;
       }
     } catch (error) {
@@ -248,16 +251,24 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
       await ensureAuth();
       const { id, ext } = options;
       const filename = `${id || createLocalId()}.${ext || "jpg"}`;
+      // v1.1.3: 用 storage.from(BUCKET).upload(name, content) 走新 SDK 路径；
+      // 这是唯一能在 storage bucket 实际存在但 listBuckets 返回空的情况下通的方式。
       const cloudPath = `${STORAGE_ROOT}/${_openid}/${filename}`;
       try {
-        const result = await app.uploadFile({
-          cloudPath,
-          fileContent: blob
-        });
-        return {
-          fileID: result.fileID,
-          cloudPath
-        };
+        const bucket = app.storage.from(STORAGE_ROOT);
+        const result = await bucket.upload(filename, blob);
+        // SDK 3.x 返回 { data: { id, path, fullPath } }；mock 返回 { fileID }。
+        // fileID 跟 cloudPath 一致：`cloud://{BUCKET}/{cloudPath}`，
+        // downloadFile 时从这个 fileID 反解 path 再调 SDK downloadFile。
+        let fileID;
+        if (result && result.fileID) {
+          fileID = result.fileID;
+        } else if (result && result.data && result.data.fullPath) {
+          fileID = `cloud://${STORAGE_ROOT}/${result.data.fullPath}`;
+        } else {
+          fileID = `cloud://${STORAGE_ROOT}/${cloudPath}`;
+        }
+        return { fileID, cloudPath };
       } catch (error) {
         throw new Error(`CloudBase uploadFile failed: ${error.message || error}`);
       }

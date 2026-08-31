@@ -116,7 +116,7 @@ test("云存储 uploadFile + downloadFile 往返", async () => {
   const blob = new Blob(["hello-world"], { type: "text/plain" });
   const result = await adapter.uploadFile(blob, { id: "asset-1", ext: "txt" });
   assert.equal(typeof result.fileID, "string");
-  assert.match(result.cloudPath, /^cat-eat-assets\//);
+  assert.match(result.cloudPath, /^cat-eat-assets-001\//);
   const downloaded = await adapter.downloadFile(result.fileID);
   // Node 的 Blob.text() 是 async；await 拿字符串
   const text = await downloaded.text();

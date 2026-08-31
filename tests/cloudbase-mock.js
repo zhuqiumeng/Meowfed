@@ -151,15 +151,38 @@ class MockStorage {
     this.files = new Map(); // cloudPath -> { content, fileID }
     this._idCounter = 0;
   }
+  // v1.1.3: 与真实 SDK 3.x 对齐——app.storage.from(bucket) 返回 Bucket 实例
+  from(bucketId) {
+    this._currentBucket = bucketId;
+    return this;
+  }
   _nextFileID() {
     this._idCounter += 1;
     return `cloud://mock-bucket/${this.app._currentUser ? this.app._currentUser.openId : "anon"}/file-${this._idCounter}`;
   }
-  async uploadFile({ cloudPath, fileContent }) {
-    const fileID = this._nextFileID();
-    this.files.set(cloudPath, { content: fileContent, fileID });
-    this.files.set(fileID, { content: fileContent, cloudPath });
+  // v1.1.3: 内部实现；外部同时支持两种调用形式：
+  //  - 旧 app.uploadFile({ cloudPath, fileContent })
+  //  - 新 app.storage.from(bucket).upload(name, content) ← 适配器用这条路径
+  async _doUpload(cloudPath, fileContent) {
+    const openid = this.app._currentUser ? this.app._currentUser.openId : "anon";
+    const bucket = this._currentBucket || "mock-bucket";
+    // 适配器传进来的是 "cat-eat-assets-001/openid-xxx/filename.ext" 这种带 bucket 前缀的 path
+    // mock 直接用 cloudPath 当 storage key
+    const finalPath = cloudPath;
+    const fileID = `cloud://${bucket}/${cloudPath}`;
+    this.files.set(finalPath, { content: fileContent, fileID });
+    this.files.set(fileID, { content: fileContent, cloudPath: finalPath });
     return { fileID, requestId: `req-${Date.now()}` };
+  }
+  async uploadFile(arg1, arg2) {
+    if (arg1 && typeof arg1 === "object" && "cloudPath" in arg1) {
+      return this._doUpload(arg1.cloudPath, arg1.fileContent);
+    }
+    return this._doUpload(arg1, arg2);
+  }
+  // v1.1.3: storage.from(bucket).upload(name, content) 走这条
+  async upload(name, content) {
+    return this._doUpload(name, content);
   }
   async downloadFile({ fileID }) {
     const entry = this.files.get(fileID);
@@ -231,6 +254,10 @@ class MockCloudBaseApp {
   }
   getTempFileURL(params) {
     return this._storage.getTempFileURL(params);
+  }
+  // v1.1.3: 与真实 SDK 3.x 对齐——app.storage 暴露 storage 实例（带 .from/.listBuckets 等）
+  get storage() {
+    return this._storage;
   }
   // 调试
   _dump() {
