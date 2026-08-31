@@ -896,10 +896,21 @@
     const { service, cloudBootstrap: bootstrap } = buildIndexedDBService();
     await service.initialize(context);
     cloudBootstrap = bootstrap || null;
-    // v1.1.3：默认不起 CloudSync。环境是 PostgreSQL（无 mongodb collection），
-    // SDK 写库会静默失败，反而让 user 误以为"已同步"。v1.1.3 阶段云同步改成
-    // opt-in：user 在主页面「云同步」卡片点「开启」按钮才调 start()。
-    // 本地 IndexedDB 数据流完全独立，不受影响。
+    // v1.1.4：CloudBase 走 PostgreSQL（PostgREST 协议），5 张表已建好，
+    // 云同步默认开启 — user 上次明确要求"上云不丢"，不要再用本地兜底。
+    // 即使 SDK 写失败，outbox 会把操作排队重试，本地 IndexedDB 数据流
+    // 仍然独立可用。
+    if (cloudBootstrap && cloudBootstrap.cloudSync && typeof cloudBootstrap.cloudSync.start === "function") {
+      try {
+        await cloudBootstrap.cloudSync.start();
+      } catch (error) {
+        // 起失败不阻塞本地 service；UI 看 cloudSync.getState() 知道详情
+        // eslint-disable-next-line no-console
+        if (typeof console !== "undefined" && console.warn) {
+          console.warn("[data-store] CloudSync.start() failed during init:", error && error.message);
+        }
+      }
+    }
     return service;
   }
 
@@ -1019,19 +1030,26 @@
       const config = getCloudBaseConfig();
       if (config) config.setEnv(env);
     },
-    // v1.1.3：opt-in 启动云同步。环境是 PostgreSQL（无 mongodb collection），
-    // SDK 写库会静默失败；user 必须显式确认"知道当前云端不可用"才开启。
-    // 返回 { ok, error, phase }；UI 据此渲染状态。
+    // v1.1.4：CloudSync 已在 initialize() 阶段默认启动；这里保留 enableCloudSync()
+    // API 是为了向后兼容 — 调用方可能仍用「点击按钮才开启」模式。已启动时直接
+    // 返回 ok，幂等。
     async enableCloudSync() {
       if (!cloudBootstrap || !cloudBootstrap.cloudSync) {
         return { ok: false, error: "CloudBootstrap 不可用（SDK 未加载或 env 未配）" };
       }
       try {
-        await cloudBootstrap.cloudSync.start();
         const state = cloudBootstrap.cloudSync.getState
           ? cloudBootstrap.cloudSync.getState()
           : null;
-        return { ok: true, phase: state && state.phase };
+        if (state && state.phase && state.phase !== "idle" && state.phase !== "error") {
+          // 已启动，幂等成功
+          return { ok: true, phase: state.phase };
+        }
+        await cloudBootstrap.cloudSync.start();
+        const newState = cloudBootstrap.cloudSync.getState
+          ? cloudBootstrap.cloudSync.getState()
+          : null;
+        return { ok: true, phase: newState && newState.phase };
       } catch (err) {
         return { ok: false, error: err && err.message ? err.message : String(err) };
       }

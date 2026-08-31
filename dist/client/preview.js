@@ -894,18 +894,19 @@ function renderCloudSyncCard() {
   const dataStore = window.CatEatData;
   if (!dataStore) return "";
 
-  // v1.1.3 急用版：本地优先。云端 opt-in（环境是 PostgreSQL，无 mongodb collection，
-  // SDK 写库会静默失败，v1.1.2 默认开启反而误导 user）。
-  // 备份 / 恢复（导出 / 导入 JSON）= user 核心需求「数据不丢」的实操方案。
-  const sdkReady = dataStore.isCloudBaseSdkAvailable();
+  // v1.1.4：CloudBase 走 PostgreSQL（PostgREST 协议），5 张表已建好，RLS anon_all
+  // 策略启用，data-store.initialize() 阶段已经默认启动 cloudSync.start()。
+  // user 上次明确要求"上云不丢"，不要用 JSON 兜底当主路径。
+  // 但保留 JSON 导出/导入作为"高级 — 跨环境迁移"按钮（不显眼）。
   const cs = dataStore.cloudSync;
-  const cloudStarted = !!cs; // data-store 默认不起云同步，cs 可能为 null
+  const sdkReady = dataStore.isCloudBaseSdkAvailable();
   const state = cs
     ? cs.getState()
-    : { phase: cloudStarted ? "error" : "off", error: cloudStarted ? "云端连接初始化失败" : "云同步未开启" };
+    : sdkReady
+      ? { phase: "error", error: "云端连接初始化失败" }
+      : { phase: "no-sdk" };
   const phaseLabel = {
     "no-sdk": "SDK 未加载",
-    "off": "本地模式",
     idle: "准备中…",
     connecting: "连接中…",
     ready: "已同步",
@@ -915,17 +916,17 @@ function renderCloudSyncCard() {
   const lastSync = state.lastSyncAt
     ? new Date(state.lastSyncAt).toLocaleString("zh-CN", { hour12: false })
     : "—";
-  let hint = "数据先存本机。导出 JSON 落到「文件」App 就能备份。";
+  let hint = "数据自动备份到云端。换设备登录同一账号可同步。";
   if (state.phase === "no-sdk") {
-    hint = "CloudBase SDK 未加载，云端同步不可用。导出 JSON 备份就行。";
-  } else if (state.phase === "off") {
-    hint = "云同步默认关闭，需要时点「开启云同步」按钮。注意：当前环境云端写入不稳定，建议优先用 JSON 备份。";
+    hint = "CloudBase SDK 未加载，云端同步暂不可用。";
   } else if (state.phase === "error") {
-    hint = (state.error || "网络或权限问题") + "。可用 JSON 备份兜底。";
+    hint = (state.error || "网络或权限问题") + "。本地数据仍可用，云端会在重连后自动恢复。";
   } else if (state.phase === "connecting" || state.phase === "idle") {
     hint = "首次连接中，约 2-5 秒。";
   } else if (state.phase === "ready") {
     hint = "数据自动备份到云端。换设备登录同一账号可同步。";
+  } else if (state.phase === "syncing") {
+    hint = "正在把本地数据上传到云端。";
   }
   return `
     <section class="home-cloud-card" aria-label="云同步">
@@ -936,18 +937,22 @@ function renderCloudSyncCard() {
       <p class="home-cloud-meta">最近一次同步：${escapeHtml(lastSync)}</p>
       <p class="home-cloud-hint">${escapeHtml(hint)}</p>
       <div class="home-cloud-actions">
-        <button type="button" class="cloud-button" data-backup-action="export">导出 JSON 备份</button>
-        <label class="cloud-button cloud-button-secondary" style="display:inline-block;cursor:pointer">
-          导入 JSON 恢复
-          <input id="cloud-import-input" type="file" accept="application/json,.json" style="display:none">
-        </label>
         ${cs ? `
         <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="push">立即上传到云</button>
         <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="pull">从云恢复</button>
-        <button type="button" class="cloud-button cloud-button-secondary home-cloud-disconnect" data-cloud-action="disconnect">断开</button>
-        ` : `
-        <button type="button" class="cloud-button cloud-button-secondary" data-backup-action="enable-cloud">开启云同步</button>
-        `}
+        <button type="button" class="cloud-button cloud-button-secondary home-cloud-disconnect" data-cloud-action="disconnect">断开云同步</button>
+        ` : ""}
+        <details class="home-cloud-advanced">
+          <summary>高级 — JSON 备份 / 恢复（跨环境迁移）</summary>
+          <div class="home-cloud-advanced-body">
+            <button type="button" class="cloud-button" data-backup-action="export">导出 JSON 备份</button>
+            <label class="cloud-button cloud-button-secondary" style="display:inline-block;cursor:pointer">
+              导入 JSON 恢复
+              <input id="cloud-import-input" type="file" accept="application/json,.json" style="display:none">
+            </label>
+            <p class="home-cloud-advanced-hint">主要用于跨 env 迁移数据。日常使用云同步即可。</p>
+          </div>
+        </details>
       </div>
     </section>
   `;

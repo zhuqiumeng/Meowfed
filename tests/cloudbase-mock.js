@@ -1,9 +1,270 @@
 // tests/cloudbase-mock.js
 //
 // 用于测试的 CloudBase SDK mock。提供和真实 SDK 同形 API 的最小实现：
-//   - database() / auth() / uploadFile() / downloadFile() / deleteFile() / getTempFileURL()
+//   - v1.1.4 主路径: app.rdb() PostgREST 客户端
+//     .from(table).select('*').eq('id', val).maybeSingle() / .single()
+//     .insert([...]) / .upsert([...]) / .update({...}) / .delete()
+//   - 旧路径: database() / auth() / uploadFile() / downloadFile() /
+//     deleteFile() / getTempFileURL()
 //   - 数据存在内存中，跨 collection 隔离
 //   - 每次启动可注入 openid 模拟已登录
+
+// ============================================================================
+// v1.1.4: PostgREST 风格 rdb() 客户端
+// ============================================================================
+
+class MockRdbQuery {
+  constructor(store) {
+    this.store = store; // MockRdbStore
+    this.table = null;
+    this.mode = null; // 'select' | 'insert' | 'upsert' | 'update' | 'delete'
+    this.payload = null; // insert/upsert/update 的数据
+    this.filters = []; // [{type:'eq',col,val}, {type:'in',col,vals}, {type:'match',obj}]
+    this._limit = null;
+    this._terminal = null; // 'single' | 'maybeSingle' | null
+  }
+
+  from(table) {
+    this.table = table;
+    return this;
+  }
+
+  select(_cols = "*") {
+    this.mode = "select";
+    return this;
+  }
+
+  insert(rows) {
+    this.mode = "insert";
+    this.payload = Array.isArray(rows) ? rows : [rows];
+    return this;
+  }
+
+  upsert(rows) {
+    this.mode = "upsert";
+    this.payload = Array.isArray(rows) ? rows : [rows];
+    return this;
+  }
+
+  update(patch) {
+    this.mode = "update";
+    this.payload = patch;
+    return this;
+  }
+
+  delete() {
+    this.mode = "delete";
+    return this;
+  }
+
+  eq(col, val) {
+    this.filters.push({ type: "eq", col, val });
+    return this;
+  }
+
+  match(obj) {
+    for (const [col, val] of Object.entries(obj || {})) {
+      this.filters.push({ type: "eq", col, val });
+    }
+    return this;
+  }
+
+  in(col, vals) {
+    this.filters.push({ type: "in", col, vals: Array.isArray(vals) ? vals : [vals] });
+    return this;
+  }
+
+  limit(n) {
+    this._limit = n;
+    return this;
+  }
+
+  single() {
+    this._terminal = "single";
+    return this._exec();
+  }
+
+  maybeSingle() {
+    this._terminal = "maybeSingle";
+    return this._exec();
+  }
+
+  // 不带 terminal 的 await -> 数组
+  then(resolve, reject) {
+    return this._exec().then(resolve, reject);
+  }
+
+  catch(reject) {
+    return this._exec().catch(reject);
+  }
+
+  async _exec() {
+    const store = this.store;
+    const table = this.table;
+    if (!table) {
+      return { data: null, error: { code: "PGRST001", message: "from() not called" } };
+    }
+    const rows = store.list(table);
+
+    if (this.mode === "select" || this.mode == null) {
+      const matched = rows.filter((r) => applyFilters(r, this.filters));
+      const limited = typeof this._limit === "number" ? matched.slice(0, this._limit) : matched;
+      if (this._terminal === "single" || this._terminal === "maybeSingle") {
+        if (limited.length === 0) {
+          if (this._terminal === "single") {
+            return { data: null, error: { code: "PGRST116", message: "Results contain 0 rows" } };
+          }
+          return { data: null, error: null };
+        }
+        if (limited.length > 1 && this._terminal === "single") {
+          return {
+            data: null,
+            error: { code: "PGRST116", message: "Results contain more than 1 rows" }
+          };
+        }
+        return { data: limited[0], error: null };
+      }
+      return { data: limited, error: null };
+    }
+
+    if (this.mode === "insert") {
+      const inserted = [];
+      for (const row of this.payload) {
+        const id = row.id != null ? String(row.id) : row.key != null ? String(row.key) : null;
+        if (id) {
+          if (store.has(table, idCol(row), id)) {
+            return { data: null, error: { code: "PGRST409", message: `duplicate key: ${id}` } };
+          }
+        }
+        const stored = store.put(table, row);
+        inserted.push(stored);
+      }
+      return { data: inserted, error: null };
+    }
+
+    if (this.mode === "upsert") {
+      const upserted = [];
+      for (const row of this.payload) {
+        const stored = store.put(table, row);
+        upserted.push(stored);
+      }
+      return { data: upserted, error: null };
+    }
+
+    if (this.mode === "update") {
+      const matched = rows.filter((r) => applyFilters(r, this.filters));
+      for (const row of matched) {
+        store.patch(table, idOf(row), this.payload);
+      }
+      return { data: matched.map((r) => store.get(table, idOf(r))).filter(Boolean), error: null };
+    }
+
+    if (this.mode === "delete") {
+      const matched = rows.filter((r) => applyFilters(r, this.filters));
+      for (const row of matched) {
+        store.remove(table, idOf(row), idCol(row));
+      }
+      return { data: null, error: null };
+    }
+
+    return { data: null, error: { code: "PGRST001", message: `unknown mode: ${this.mode}` } };
+  }
+}
+
+function idCol(row) {
+  if (row && row.id != null) return "id";
+  if (row && row.key != null) return "key";
+  return "id";
+}
+
+function idOf(row) {
+  if (!row) return null;
+  return row.id != null ? String(row.id) : row.key != null ? String(row.key) : null;
+}
+
+function applyFilters(row, filters) {
+  for (const f of filters) {
+    if (f.type === "eq") {
+      if (String(row[f.col]) !== String(f.val)) return false;
+    } else if (f.type === "in") {
+      const set = new Set((f.vals || []).map(String));
+      if (!set.has(String(row[f.col]))) return false;
+    }
+  }
+  return true;
+}
+
+class MockRdbStore {
+  constructor() {
+    // table -> Map(idCol_value -> row)
+    this.tables = new Map();
+  }
+  _bucket(table) {
+    if (!this.tables.has(table)) this.tables.set(table, new Map());
+    return this.tables.get(table);
+  }
+  list(table) {
+    return Array.from(this._bucket(table).values());
+  }
+  has(table, idCol, id) {
+    return this._bucket(table).has(`${idCol}:${id}`);
+  }
+  get(table, id) {
+    return this._bucket(table).get(`id:${id}`) || this._bucket(table).get(`key:${id}`) || null;
+  }
+  put(table, row) {
+    const id = idOf(row);
+    if (!id) return row;
+    const col = idCol(row);
+    this._bucket(table).set(`${col}:${id}`, { ...row });
+    return this._bucket(table).get(`${col}:${id}`);
+  }
+  patch(table, id, patch) {
+    if (!id) return;
+    const realId = id.split(":").pop();
+    // 尝试两个 col 都能找到
+    for (const col of ["id", "key"]) {
+      const existing = this._bucket(table).get(`${col}:${realId}`);
+      if (existing) {
+        const updated = { ...existing, ...patch };
+        this._bucket(table).set(`${col}:${realId}`, updated);
+        return;
+      }
+    }
+  }
+  remove(table, id, col) {
+    if (!id) return;
+    const realCol = col || "id";
+    this._bucket(table).delete(`${realCol}:${id}`);
+  }
+  clear() {
+    this.tables.clear();
+  }
+}
+
+class MockRdb {
+  constructor(store) {
+    this.store = store;
+  }
+  from(table) {
+    const q = new MockRdbQuery(this.store);
+    return q.from(table);
+  }
+  rpc(fnName, _args) {
+    // mock 不支持 PG function DDL
+    return Promise.resolve({
+      data: null,
+      error: {
+        code: "EXCEED_AUTHORITY",
+        message: `Request exceeds granted authority (mock: rpc(${fnName}) disabled)`
+      }
+    });
+  }
+}
+
+// ============================================================================
+// 旧路径: database() + auth() + storage() (向后兼容)
+// ============================================================================
 
 class MockQuery {
   constructor(collection) {
@@ -229,6 +490,8 @@ class MockCloudBaseApp {
     this._database = new MockDatabase(this);
     this._auth = new MockAuth(this);
     this._storage = new MockStorage(this);
+    this._rdbStore = new MockRdbStore();
+    this._rdb = new MockRdb(this._rdbStore);
     if (options.preauthOpenId) {
       this._currentUser = { openId: options.preauthOpenId, isAnonymous: true };
     }
@@ -242,6 +505,10 @@ class MockCloudBaseApp {
   }
   auth() {
     return this._auth;
+  }
+  // v1.1.4: PostgREST 客户端
+  rdb() {
+    return this._rdb;
   }
   uploadFile(params) {
     return this._storage.uploadFile(params);
@@ -262,6 +529,14 @@ class MockCloudBaseApp {
   // 调试
   _dump() {
     return this._database._all();
+  }
+  // v1.1.4: dump rdb 数据（PostgreSQL 表）
+  _rdbDump() {
+    const out = {};
+    for (const [table, bucket] of this._rdbStore.tables.entries()) {
+      out[table] = Array.from(bucket.values());
+    }
+    return out;
   }
 }
 
@@ -293,5 +568,8 @@ module.exports = {
   MockDatabase,
   MockCollection,
   MockQuery,
-  MockDocRef
+  MockDocRef,
+  MockRdb,
+  MockRdbQuery,
+  MockRdbStore
 };
