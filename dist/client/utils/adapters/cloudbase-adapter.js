@@ -35,7 +35,9 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
   }
 
   const db = app.database();
-  const STORAGE_ROOT = storageRoot || "cat-eat-assets";
+  // v1.1.2: CloudBase 存储桶名，由 user 在 console 实际创建决定（v1.1.2 修包确认
+  // 桶名 = "meowfed-assets"，跟 docs/07 §6.5 描述一致；原默认 "cat-eat-assets" 是占位）。
+  const STORAGE_ROOT = storageRoot || "meowfed-assets";
   const STORAGE_BATCH = 100; // CloudBase 单次删除 fileList 上限
 
   // ---- Auth ----
