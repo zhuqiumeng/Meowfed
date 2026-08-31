@@ -802,9 +802,14 @@ function renderDiagPanel() {
         <pre class="diag-pre" data-diag-out="drift">（点上面按钮开始）</pre>
         <button class="diag-btn" data-diag-action="export">5. 一键导出全量 JSON</button>
         <pre class="diag-pre" data-diag-out="export">（点上面按钮开始）</pre>
-        <button class="diag-btn diag-btn-danger" data-diag-action="fix">6. 把所有食物.catId 改成 meta.catId（修复漂移）</button>
+        <label class="diag-btn" data-diag-action="import" style="display:inline-block;cursor:pointer">
+          6. 从 JSON 文件恢复（选文件）
+          <input id="import-input" type="file" accept="application/json,.json" style="display:none">
+        </label>
+        <pre class="diag-pre" data-diag-out="import">（选 JSON 文件后自动导入）</pre>
+        <button class="diag-btn diag-btn-danger" data-diag-action="fix">7. 把所有食物.catId 改成 meta.catId（修复漂移）</button>
         <pre class="diag-pre" data-diag-out="fix">（点上面按钮开始）</pre>
-        <button class="diag-btn" data-diag-action="cloudsync">7. 检查 SDK / cloudSync 状态（v1.1.2 调试）</button>
+        <button class="diag-btn" data-diag-action="cloudsync">8. 检查 SDK / cloudSync 状态（v1.1.2 调试）</button>
         <pre class="diag-pre" data-diag-out="cloudsync">（点上面按钮开始）</pre>
       </div>
     </details>
@@ -850,6 +855,12 @@ function bindDiagActions() {
     const btn = event.target.closest("[data-diag-action]");
     if (!btn) return;
     const action = btn.dataset.diagAction;
+    // import 走 file input.change 单独处理（label 只是触发点击）
+    if (action === "import") {
+      const input = panel.querySelector("#import-input");
+      if (input) input.click();
+      return;
+    }
     try {
       diagSetOut(action, "执行中…");
       const result = await dispatchDiagAction(action);
@@ -858,20 +869,43 @@ function bindDiagActions() {
       diagSetOut(action, "ERR: " + (e && e.message ? e.message : e));
     }
   });
+  // import input change → 调 import action
+  const importInput = panel.querySelector("#import-input");
+  if (importInput) {
+    importInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        diagSetOut("import", "导入 " + file.name + " 中…");
+        const out = await loadDiagModule();
+        const result = await out.run("import", dataStore, file);
+        diagSetOut("import", result);
+      } catch (e) {
+        diagSetOut("import", "ERR: " + (e && e.message ? e.message : e));
+      } finally {
+        // 同一文件可重复选
+        event.target.value = "";
+      }
+    });
+  }
 }
 
 function renderCloudSyncCard() {
   const dataStore = window.CatEatData;
   if (!dataStore) return "";
 
-  // v1.1.2：env ID 有 hardcoded default，UI 改成「状态显示 + 主动操作按钮」，
-  // 不再有「填 env ID」onboarding。启动时 data-store 已自动 cloudSync.start()。
-  // SDK 未加载 / cloudSync 不可用时显示诊断信息，方便排查。
+  // v1.1.3 急用版：本地优先。云端 opt-in（环境是 PostgreSQL，无 mongodb collection，
+  // SDK 写库会静默失败，v1.1.2 默认开启反而误导 user）。
+  // 备份 / 恢复（导出 / 导入 JSON）= user 核心需求「数据不丢」的实操方案。
   const sdkReady = dataStore.isCloudBaseSdkAvailable();
   const cs = dataStore.cloudSync;
-  const state = cs ? cs.getState() : { phase: sdkReady ? "error" : "no-sdk", error: sdkReady ? "云端连接初始化失败" : "CloudBase SDK 未加载" };
+  const cloudStarted = !!cs; // data-store 默认不起云同步，cs 可能为 null
+  const state = cs
+    ? cs.getState()
+    : { phase: cloudStarted ? "error" : "off", error: cloudStarted ? "云端连接初始化失败" : "云同步未开启" };
   const phaseLabel = {
-    "no-sdk": "未配置",
+    "no-sdk": "SDK 未加载",
+    "off": "本地模式",
     idle: "准备中…",
     connecting: "连接中…",
     ready: "已同步",
@@ -881,12 +915,13 @@ function renderCloudSyncCard() {
   const lastSync = state.lastSyncAt
     ? new Date(state.lastSyncAt).toLocaleString("zh-CN", { hour12: false })
     : "—";
-  // 友好提示文案随状态变
-  let hint = "数据自动备份到云端，无需手动操作。";
+  let hint = "数据先存本机。导出 JSON 落到「文件」App 就能备份。";
   if (state.phase === "no-sdk") {
-    hint = "SDK 加载失败，刷新页面或检查网络。";
+    hint = "CloudBase SDK 未加载，云端同步不可用。导出 JSON 备份就行。";
+  } else if (state.phase === "off") {
+    hint = "云同步默认关闭，需要时点「开启云同步」按钮。注意：当前环境云端写入不稳定，建议优先用 JSON 备份。";
   } else if (state.phase === "error") {
-    hint = state.error || "网络或权限问题，重试或检查调试工具。";
+    hint = (state.error || "网络或权限问题") + "。可用 JSON 备份兜底。";
   } else if (state.phase === "connecting" || state.phase === "idle") {
     hint = "首次连接中，约 2-5 秒。";
   } else if (state.phase === "ready") {
@@ -900,13 +935,20 @@ function renderCloudSyncCard() {
       </header>
       <p class="home-cloud-meta">最近一次同步：${escapeHtml(lastSync)}</p>
       <p class="home-cloud-hint">${escapeHtml(hint)}</p>
-      ${cs ? `
       <div class="home-cloud-actions">
-        <button type="button" class="cloud-button" data-cloud-action="push">立即上传到云</button>
+        <button type="button" class="cloud-button" data-backup-action="export">导出 JSON 备份</button>
+        <label class="cloud-button cloud-button-secondary" style="display:inline-block;cursor:pointer">
+          导入 JSON 恢复
+          <input id="cloud-import-input" type="file" accept="application/json,.json" style="display:none">
+        </label>
+        ${cs ? `
+        <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="push">立即上传到云</button>
         <button type="button" class="cloud-button cloud-button-secondary" data-cloud-action="pull">从云恢复</button>
         <button type="button" class="cloud-button cloud-button-secondary home-cloud-disconnect" data-cloud-action="disconnect">断开</button>
+        ` : `
+        <button type="button" class="cloud-button cloud-button-secondary" data-backup-action="enable-cloud">开启云同步</button>
+        `}
       </div>
-      ` : `<div class="home-cloud-actions"><button type="button" class="cloud-button" data-cloud-action="retry">重试</button></div>`}
     </section>
   `;
 }
@@ -2535,6 +2577,62 @@ function bindEvents() {
         showToast(`操作失败：${error.message || error}`);
       }
     });
+  });
+
+  // v1.1.3：本地优先 — 导出 / 导入 JSON 备份（user 核心需求「数据不丢」实操）
+  document.querySelectorAll("[data-backup-action]").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      const action = event.currentTarget.dataset.backupAction;
+      const dataStore = window.CatEatData;
+      if (!dataStore) return;
+      try {
+        if (action === "export") {
+          // 复用调试抽屉的 diag.js（loadDiagModule）
+          const out = await loadDiagModule();
+          const result = await out.run("export", dataStore);
+          showToast(result.split("\n")[0] || "导出完成");
+        } else if (action === "enable-cloud") {
+          if (!confirm("云端写入当前可能不稳定（PostgreSQL env 无 mongodb collection）。\n确定要开启吗？")) {
+            return;
+          }
+          const result = await dataStore.enableCloudSync();
+          if (result.ok) {
+            showToast("云同步已开启");
+            render();
+          } else {
+            showToast(`开启失败：${result.error}`);
+          }
+        }
+      } catch (error) {
+        showToast(`备份操作失败：${error.message || error}`);
+      }
+    });
+  });
+
+  // v1.1.3：主页面「导入 JSON 恢复」file input
+  const cloudImportInput = document.querySelector("#cloud-import-input");
+  cloudImportInput?.addEventListener("change", async (event) => {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    if (!confirm("导入会覆盖当前所有数据（meta / cats / foods / results / assets）。\n\n建议先「导出 JSON 备份」再做导入。\n\n确定要继续吗？")) {
+      event.target.value = "";
+      return;
+    }
+    const dataStore = window.CatEatData;
+    if (!dataStore) {
+      event.target.value = "";
+      return;
+    }
+    try {
+      const out = await loadDiagModule();
+      const result = await out.run("import", dataStore, file);
+      showToast(result.indexOf("✅") >= 0 ? "导入完成，刷新页面看效果" : `导入失败：${result}`);
+      render();
+    } catch (error) {
+      showToast(`导入失败：${error.message || error}`);
+    } finally {
+      event.target.value = "";
+    }
   });
 
   const photoInput = document.querySelector("#photo-input");

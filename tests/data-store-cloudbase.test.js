@@ -45,6 +45,7 @@ test("未注入 cloud 时 isCloudBaseConfigured() === false", async () => {
 test("注入 cloud 后 status().capabilities.cloud === true（Risk 16）", async () => {
   const store = makeDataStore({ withCloud: true });
   await store.initialize();
+  await store.enableCloudSync();
   await waitFor(() => store.cloudSync.getState().phase === "ready", 1000);
   assert.equal(store.isCloudBaseConfigured(), true);
   // DataService.status().capabilities.cloud 反映 activeRepo.kind === "mirror"
@@ -76,6 +77,7 @@ test("注入 cloud 后 store.cloudSync 不为 null；写业务方法触发云端
   const store = makeDataStore({ withCloud: true });
   await store.initialize();
   assert.notEqual(store.cloudSync, null);
+  await store.enableCloudSync();
   await waitFor(() => store.cloudSync.getState().phase === "ready", 1000);
   assert.equal(store.isCloudBaseConfigured(), true);
 
@@ -105,6 +107,7 @@ test("注入 cloud 后 store.cloudSync 不为 null；写业务方法触发云端
 test("pushFirstTime 把本地历史数据全量推云", async () => {
   const store = makeDataStore({ withCloud: true });
   await store.initialize();
+  await store.enableCloudSync();
   await waitFor(() => store.cloudSync.getState().phase === "ready", 1000);
 
   // 写一些历史数据
@@ -130,6 +133,7 @@ test("pullFromCloud 重建本地：模拟在新设备上恢复", async () => {
   // 设备 A：写数据
   const storeA = makeDataStoreWith({ sdk: sharedSdk, env: "shared-env" });
   await storeA.initialize();
+  await storeA.enableCloudSync();
   await waitFor(() => storeA.cloudSync.getState().phase === "ready", 1000);
   await storeA.saveFood({ brand: "X", name: "Y", flavor: "", texture: "肉泥" });
   await waitFor(async () => {
@@ -140,6 +144,7 @@ test("pullFromCloud 重建本地：模拟在新设备上恢复", async () => {
   // 设备 B：完全空的本地 + 共用云
   const storeB = makeDataStoreWith({ sdk: sharedSdk, env: "shared-env" });
   await storeB.initialize();
+  await storeB.enableCloudSync();
   await waitFor(() => storeB.cloudSync.getState().phase === "ready", 1000);
   assert.equal(storeB.getFoods().length, 0);
 

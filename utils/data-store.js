@@ -896,12 +896,10 @@
     const { service, cloudBootstrap: bootstrap } = buildIndexedDBService();
     await service.initialize(context);
     cloudBootstrap = bootstrap || null;
-    // 自动起 CloudSync：失败不影响本地数据流
-    if (cloudBootstrap && cloudBootstrap.cloudSync) {
-      cloudBootstrap.cloudSync.start().catch((err) => {
-        // network / auth 失败时静默；UI 通过 cloudSync.getState() 读 phase
-      });
-    }
+    // v1.1.3：默认不起 CloudSync。环境是 PostgreSQL（无 mongodb collection），
+    // SDK 写库会静默失败，反而让 user 误以为"已同步"。v1.1.3 阶段云同步改成
+    // opt-in：user 在主页面「云同步」卡片点「开启」按钮才调 start()。
+    // 本地 IndexedDB 数据流完全独立，不受影响。
     return service;
   }
 
@@ -1020,6 +1018,23 @@
     setCloudBaseEnv(env) {
       const config = getCloudBaseConfig();
       if (config) config.setEnv(env);
+    },
+    // v1.1.3：opt-in 启动云同步。环境是 PostgreSQL（无 mongodb collection），
+    // SDK 写库会静默失败；user 必须显式确认"知道当前云端不可用"才开启。
+    // 返回 { ok, error, phase }；UI 据此渲染状态。
+    async enableCloudSync() {
+      if (!cloudBootstrap || !cloudBootstrap.cloudSync) {
+        return { ok: false, error: "CloudBootstrap 不可用（SDK 未加载或 env 未配）" };
+      }
+      try {
+        await cloudBootstrap.cloudSync.start();
+        const state = cloudBootstrap.cloudSync.getState
+          ? cloudBootstrap.cloudSync.getState()
+          : null;
+        return { ok: true, phase: state && state.phase };
+      } catch (err) {
+        return { ok: false, error: err && err.message ? err.message : String(err) };
+      }
     }
   };
 

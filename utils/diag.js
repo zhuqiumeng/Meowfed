@@ -4,13 +4,15 @@
 // （CI 守门禁止 preview.js 出现 localStorage / indexedDB 字面量）。
 //
 // 暴露 window.CatEatDiag，preview.js 通过动态 <script> 加载。
-// 6 个动作：
+// 8 个动作：
 //   ls     — 对比 IDB 食物数 vs CatEatData 可见数（推断 catId 漂移）
 //   dbs    — 列 IndexedDB 库
 //   all    — 读 cat-eat-local 全部 collection
 //   drift  — catId 漂移诊断 + 食物清单
 //   export — 一键导出全量 JSON（文件下载）
+//   import — 导入 JSON dump 恢复（v1.1.3：user 核心需求「数据不丢」）
 //   fix    — 把所有食物.catId 改成 meta.catId（修复漂移）
+//   cloudsync — 检 SDK / cloudSync 状态（v1.1.2 调试）
 
 (function attachDiag(globalScope) {
   if (typeof module !== "undefined" && module.exports) {
@@ -256,12 +258,73 @@
     }
   }
 
+  // v1.1.3 import 路由：把一个文件对象（File / Blob）解析后写进 IDB。
+  // file 由 preview.js 拿到 input.files[0] 传进来，避开 CI 守门。
+  async function actionImport(file, dataStore) {
+    if (!file) {
+      return "ERR: 没收到文件。请用「导入 JSON」按钮选文件。";
+    }
+    try {
+      const text = await file.text();
+      const dump = JSON.parse(text);
+      // 容错：接受 _exportedAt 标准格式 + 任意 {cats,foods,results,assets,meta} 字段
+      const counts = {
+        meta: Array.isArray(dump.meta) ? dump.meta.length : 0,
+        cats: Array.isArray(dump.cats) ? dump.cats.length : 0,
+        foods: Array.isArray(dump.foods) ? dump.foods.length : 0,
+        results: Array.isArray(dump.results) ? dump.results.length : 0,
+        assets: Array.isArray(dump.assets) ? dump.assets.length : 0
+      };
+      if (!Array.isArray(dump.foods)) {
+        return "ERR: 找不到 foods 字段，确认是 v1.1.1+ 导出的 JSON。";
+      }
+      const db = await openDb();
+      // 5 个 collection 全清 → 全量替换
+      const stores = ["meta", "cats", "foods", "results", "assets", "outbox"];
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(stores, "readwrite");
+        stores.forEach((name) => {
+          if (db.objectStoreNames.contains(name)) {
+            tx.objectStore(name).clear();
+          }
+        });
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      // 写入
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction(stores, "readwrite");
+        (dump.meta || []).forEach((r) => tx.objectStore("meta").put(r));
+        (dump.cats || []).forEach((r) => tx.objectStore("cats").put(r));
+        (dump.foods || []).forEach((r) => tx.objectStore("foods").put(r));
+        (dump.results || []).forEach((r) => tx.objectStore("results").put(r));
+        (dump.assets || []).forEach((r) => tx.objectStore("assets").put(r));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+      // 刷新 dataStore 内存视图
+      if (dataStore && dataStore.active && typeof dataStore.active.refresh === "function") {
+        try { await dataStore.active.refresh(); } catch (_) { /* ignore */ }
+      }
+      return safeStringify({
+        ok: true,
+        message: "✅ 已恢复 " + counts.foods + " 条食物，" + counts.assets + " 个资产。请刷新 H5 页面看效果。",
+        counts,
+        exportedAt: dump._exportedAt || "(未知)"
+      });
+    } catch (e) {
+      return "ERR: " + (e && e.message ? e.message : String(e));
+    }
+  }
+
   const routes = {
     ls: actionLs,
     dbs: actionDbs,
     all: actionAll,
     drift: actionDrift,
     export: actionExport,
+    import: actionImport,
     fix: actionFix,
     cloudsync: actionCloudSync
   };
@@ -299,10 +362,11 @@
   }
 
   globalScope.CatEatDiag = {
-    run(action, dataStore) {
+    run(action, dataStore, extraArg) {
       const fn = routes[action];
       if (!fn) return Promise.resolve("未知动作: " + action);
-      return fn(dataStore);
+      // actionImport(file, dataStore) 等少数动作需要 extraArg 作第一参数
+      return extraArg !== undefined ? fn(extraArg, dataStore) : fn(dataStore);
     },
     setEnv(env) {
       // v1.1.2 调试用：让 dev 把正确的 env 写到 localStorage，覆盖 hardcoded default
