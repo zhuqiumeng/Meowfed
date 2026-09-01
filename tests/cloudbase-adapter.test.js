@@ -147,7 +147,7 @@ test("与 IndexedDBAdapter 数据契约一致：相同字段读写", async () =>
   const idbAdapter = createIndexedDBAdapter({
     indexedDB: new IDBFactory(),
     DB_NAME: "test-x",
-    DB_VERSION: 1,
+    DB_VERSION: 2,
     setupSchema(db) {
       db.createObjectStore("foods", { keyPath: "id" });
     }

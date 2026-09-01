@@ -20,7 +20,7 @@ async function makeFixture() {
   const adapter = createIndexedDBAdapter({
     indexedDB: new IDBFactory(),
     DB_NAME: "cloud-sync-test",
-    DB_VERSION: 1,
+    DB_VERSION: 2,
     setupSchema(db) {
       for (const name of COLLECTIONS) {
         db.createObjectStore(name, { keyPath: name === "meta" ? "key" : "id" });

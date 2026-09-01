@@ -17,7 +17,7 @@ function makeLocalRepo(name = "sync-test") {
   const adapter = createIndexedDBAdapter({
     indexedDB: new IDBFactory(),
     DB_NAME: name,
-    DB_VERSION: 1,
+    DB_VERSION: 2,
     setupSchema(db) {
       // LocalRepository 会把 KNOWN_COLLECTIONS（meta/cats/foods/results/assets）
       // 和 options.collections 合并，所以 IDB 必须包含全部 6 个 store

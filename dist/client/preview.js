@@ -2856,6 +2856,14 @@ async function bootstrap() {
     participantId: invite ? `invite:${invite}` : ""
   });
 
+  // v1.1.4-fix: 订阅 cloudSync state 变化(start/push/pull 完成后 setState 触发 UI 重渲染)
+  // 不订阅的话"准备中…"会一直挂着,因为只有 render() 才会重画云同步卡片
+  if (dataStore.cloudSync && typeof dataStore.cloudSync.subscribe === "function") {
+    dataStore.cloudSync.subscribe(() => {
+      if (state.screen === "home") render();
+    });
+  }
+
   if (params.get("screen") === "record") {
     state.screen = "home";
     history.replaceState(null, "", "?screen=home");

@@ -38,7 +38,9 @@
   }
 })(typeof globalThis !== "undefined" ? globalThis : this, function createDataStore(options = {}) {
   const DB_NAME = "cat-eat-local";
-  const DB_VERSION = 1;
+  // v1.1.4-hotfix: bump 1→2 给已有 IDB DB 补 outbox store (cloudSync 写 outbox 需要)
+  // v1 schema 没 outbox,cloudSync.start() 第一次跑就 "object store not found"。
+  const DB_VERSION = 2;
   const SCHEMA_VERSION = 1;
   const DEFAULT_CAT_AVATAR = "./assets/cat-profile-default.jpg";
   const LEGACY_KEYS = {
@@ -340,18 +342,9 @@
 
   function loadCloudBaseModules() {
     const modules = {};
-    // v1.1.4-fix: 浏览器 esbuild bundle 走 globalThis 挂载路径;Node 端走 require。
-    // 之前 esbuild 把 require 也 inline,导致 tryCreateCloudBootstrap 调不到 createCloudBaseAdapter。
-    // 这里把两条路都保留,但浏览器只走 globalThis(更直接,避开 esbuild lazy require 的坑)。
-    const isNode = typeof module !== "undefined" && module.exports;
-    if (!isNode) {
-      modules.adapterMod = globalThis.CatEatCloudBaseAdapter;
-      modules.cloudRepoMod = globalThis.CatEatCloudRepository;
-      modules.outboxMod = globalThis.CatEatOutbox;
-      modules.syncRepoMod = globalThis.CatEatSyncRepository;
-      modules.cloudSyncMod = globalThis.CatEatCloudSync;
-      return modules;
-    }
+    // 浏览器 esbuild bundle 把 5 个 module inline 进 IIFE 闭包,typeof require === "function"
+    // (esbuild shim) 且 require() 能返回 inline 的 module 对象。所以浏览器端也走 require 路径。
+    // globalThis 路径作为兜底(用户显式 <script> 加载 module 时也会挂上)。
     if (typeof require === "function") {
       try {
         modules.adapterMod = require("./adapters/cloudbase-adapter");
@@ -368,6 +361,22 @@
       try {
         modules.cloudSyncMod = require("./cloud-sync");
       } catch (error) {/* ignore */}
+    }
+    // 兜底:globalThis 路径覆盖 <script> 加载的情况
+    if (!modules.adapterMod && globalThis.CatEatCloudBaseAdapter) {
+      modules.adapterMod = globalThis.CatEatCloudBaseAdapter;
+    }
+    if (!modules.cloudRepoMod && globalThis.CatEatCloudRepository) {
+      modules.cloudRepoMod = globalThis.CatEatCloudRepository;
+    }
+    if (!modules.outboxMod && globalThis.CatEatOutbox) {
+      modules.outboxMod = globalThis.CatEatOutbox;
+    }
+    if (!modules.syncRepoMod && globalThis.CatEatSyncRepository) {
+      modules.syncRepoMod = globalThis.CatEatSyncRepository;
+    }
+    if (!modules.cloudSyncMod && globalThis.CatEatCloudSync) {
+      modules.cloudSyncMod = globalThis.CatEatCloudSync;
     }
     return modules;
   }
@@ -948,7 +957,14 @@
     // v1.1.4 debug: 先把 cloudBootstrap 装到 module-level,即使 service.initialize 后面
     // 抛错让流程掉到 legacy,ds.cloudSync 还能拿到,云端异步 push 才能继续。
     cloudBootstrap = bootstrap || null;
-    await service.initialize(context);
+    // v1.1.4-hotfix: service.initialize 抛错也先调一次 cloudSync.start(),否则即使
+    // 走 legacy 路径,ds.cloudSync 也只是空壳,phase 永远停在 idle,UI 一直显示"准备中…"
+    let initError = null;
+    try {
+      await service.initialize(context);
+    } catch (error) {
+      initError = error;
+    }
     // v1.1.4：CloudBase 走 PostgreSQL（PostgREST 协议），5 张表已建好，
     // 云同步默认开启 — user 上次明确要求"上云不丢"，不要再用本地兜底。
     // 即使 SDK 写失败，outbox 会把操作排队重试，本地 IndexedDB 数据流
@@ -963,6 +979,10 @@
           console.warn("[data-store] CloudSync.start() failed during init:", error && error.message);
         }
       }
+    }
+    if (initError) {
+      // 把 service.initialize 的错抛出去让上层走 legacy,但 cloudSync.start() 已经跑过
+      throw initError;
     }
     return service;
   }

@@ -82,6 +82,22 @@ function createCloudSync({ adapter, cloudRepo, localRepo, outbox, now, onLocalCh
 
   function setState(patch) {
     state = { ...state, ...patch };
+    // v1.1.4-debug: 每次 setState 写一行 state 到 DOM,方便 user 看到 start/push/pull
+    // 实际跑到哪一步/是否卡住
+    try {
+      const tag = (state.phase || "?") + (state.error ? ":" + state.error.slice(0, 80) : "");
+      const el = document.getElementById("__cloud_sync_state_log__")
+        || (() => {
+          const d = document.createElement("pre");
+          d.id = "__cloud_sync_state_log__";
+          d.style.cssText = "position:fixed;bottom:0;right:0;background:#000;color:#0f0;padding:4px;font-size:10px;z-index:99999;font-family:monospace;max-width:300px;";
+          (document.body || document.documentElement).appendChild(d);
+          return d;
+        })();
+      el.textContent = "cs:" + tag;
+      // 同时把最新 state 暴露给 window 方便 diag 抓
+      globalThis.__CLOUDBASE_SYNC_STATE__ = state;
+    } catch {}
     emit();
   }
 

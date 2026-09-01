@@ -16,7 +16,7 @@ async function makeFixture() {
   const adapter = createIndexedDBAdapter({
     indexedDB: new IDBFactory(),
     DB_NAME: "outbox-test",
-    DB_VERSION: 1,
+    DB_VERSION: 2,
     setupSchema(db) {
       db.createObjectStore("foods", { keyPath: "id" });
       db.createObjectStore("outbox", { keyPath: "id" });

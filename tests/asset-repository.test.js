@@ -15,7 +15,7 @@ function makeLocal() {
   const adapter = createIndexedDBAdapter({
     indexedDB: new IDBFactory(),
     DB_NAME: "asset-test",
-    DB_VERSION: 1,
+    DB_VERSION: 2,
     setupSchema(db) {
       db.createObjectStore("assets", { keyPath: "id" });
       db.createObjectStore("foods", { keyPath: "id" });
