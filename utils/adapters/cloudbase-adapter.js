@@ -108,7 +108,9 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
   // 返回 { data, error } 结构。error = null 表示成功。
 
   function rdb() {
-    return app.rdb();
+    // v1.1.4: 必须传 database: 'public'。PostgREST 走 Accept-Profile / Content-Profile header
+    // 指定 schema。不传时 SDK 默认把 envId 当 schema 名,会全部报 PGRST106 Invalid schema。
+    return app.rdb({ database: "public" });
   }
 
   function undecorate(row) {
