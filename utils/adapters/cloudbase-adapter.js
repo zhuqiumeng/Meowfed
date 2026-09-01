@@ -119,7 +119,29 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
     // RLS 自动注入的字段不暴露给上层
     delete copy._openid;
     delete copy.owner_id_filter; // 可能的 RLS 内部字段
-    return copy;
+    // v1.1.4-fix: PG 列名是 snake_case,转回 camelCase 给上层(保持 IDB 契约)
+    return snakeToCamelKeys(copy);
+  }
+
+  // v1.1.4-fix: IDB 字段名是 camelCase,PG 列名是 snake_case
+  // 通用双向转换(只改一层 key,JSONB 内的 nested object 不动)
+  function camelToSnakeKeys(obj) {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+    const out = {};
+    for (const k of Object.keys(obj)) {
+      const snake = k.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+      out[snake] = obj[k];
+    }
+    return out;
+  }
+  function snakeToCamelKeys(obj) {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+    const out = {};
+    for (const k of Object.keys(obj)) {
+      const camel = k.replace(/_([a-z])/g, (m, c) => c.toUpperCase());
+      out[camel] = obj[k];
+    }
+    return out;
   }
 
   function isNotFoundError(error) {
@@ -196,10 +218,11 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
         if (record[idCol] == null && record.id == null && record.key == null) {
           throw new Error("Record must have id or key for CloudBase.put");
         }
-        const row = { ...record };
-        // 去掉 SDK 内部字段
+        // v1.1.4-fix: IDB 字段 camelCase → PG 列 snake_case;schemaVersion strip
+        const row = camelToSnakeKeys({ ...record });
         delete row._id;
         delete row._openid;
+        delete row.schema_version;
         const { error } = await rdb().from(storeName).upsert([row]);
         if (error) throw error;
         return record;
@@ -212,9 +235,34 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
       if (!Array.isArray(records) || records.length === 0) return;
       // PostgREST 支持批量 insert/upsert；一次写一批
       const rows = records.map((r) => {
-        const copy = { ...r };
+        // v1.1.4-fix: IDB 字段 camelCase → PG 列 snake_case(对 meta 表先做 value 包封再转)
+        let copy = camelToSnakeKeys({ ...r });
         delete copy._id;
         delete copy._openid;
+        // v1.1.4-fix: schemaVersion 是 IDB 内部元数据,PG 表没这列,strip
+        delete copy.schema_version;
+        // v1.1.4-fix: IDB 时间戳是 Unix ms (number),PG 是 TIMESTAMPTZ → ISO string
+        for (const k of ["created_at", "updated_at", "manual_retry_after", "completed_at"]) {
+          if (typeof copy[k] === "number" && copy[k] > 0) {
+            copy[k] = new Date(copy[k]).toISOString();
+          }
+        }
+        // v1.1.4-fix: owner_id 是 NOT NULL,IDB 没填时默认 "anonymous"
+        if (copy.owner_id == null && storeName !== "meta") {
+          copy.owner_id = "anonymous";
+        }
+        // v1.1.4-fix: meta 表 PG schema 只有 key + value 两列;旧 IDB 里的迁移记录
+        // 仍可能带 status/source/completedAt 等扁平字段 — 全部塞进 value JSONB
+        if (storeName === "meta") {
+          const key = copy.key;
+          let value = copy.value;
+          if (value == null) {
+            // 旧记录(扁平字段)塞进 value
+            value = { ...copy };
+            delete value.key;
+          }
+          return { key, value };
+        }
         return copy;
       });
       try {
@@ -243,25 +291,35 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
     async clear(storeName) {
       // MVP：不实现真「清空 collection」单调用；先 list 再逐条 delete。
       // 生产环境应改成云函数（避免权限扩散）。
-      try {
-        const { data, error: listError } = await rdb()
-          .from(storeName)
-          .select("id,key");
-        if (listError) {
-          if (listError.code && /PGRST205|not.*found/i.test(listError.message || "")) {
-            return;
+      // v1.1.4-fix: 5 张表 schema 不统一(meta 是 key 主键无 id,其他 4 张是 id 主键),
+      // 按 storeName 选列;同时 catch 住"列不存在"错误回退另一种尝试
+      const tryCols = storeName === "meta" ? ["key", "id"] : ["id", "key"];
+      let rows = [];
+      for (const cols of tryCols) {
+        try {
+          const { data, error: listError } = await rdb()
+            .from(storeName)
+            .select(cols);
+          if (listError) {
+            if (listError.code && /PGRST205|not.*found/i.test(listError.message || "")) {
+              return;
+            }
+            // 列不存在错误,回退到下一个 tryCols
+            if (/does not exist/i.test(listError.message || "")) continue;
+            throw listError;
           }
-          throw listError;
+          rows = data || [];
+          break;
+        } catch (e) {
+          if (/does not exist/i.test(e.message || "")) continue;
+          throw e;
         }
-        const rows = data || [];
-        for (const row of rows) {
-          const k = row.id != null ? row.id : row.key;
-          if (k != null) {
-            await this.delete(storeName, k);
-          }
+      }
+      for (const row of rows) {
+        const k = row.id != null ? row.id : row.key;
+        if (k != null) {
+          await this.delete(storeName, k);
         }
-      } catch (error) {
-        throw new Error(`CloudBase clear(${storeName}) failed: ${error.message || error}`);
       }
     },
 

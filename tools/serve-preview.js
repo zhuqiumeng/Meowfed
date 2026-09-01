@@ -66,6 +66,19 @@ const server = http.createServer((request, response) => {
   });
 });
 
-server.listen(port, "127.0.0.1", () => {
+// v1.1.4：绑 0.0.0.0 让 iPhone 等局域网设备能访问。打印局域网 IP 方便对照。
+server.listen(port, "0.0.0.0", () => {
+  const { networkInterfaces } = require("node:os");
+  const ips = [];
+  for (const list of Object.values(networkInterfaces())) {
+    for (const i of list || []) {
+      if (i.family === "IPv4" && !i.internal) ips.push(i.address);
+    }
+  }
   console.log(`Preview ready at http://127.0.0.1:${port}`);
+  if (ips.length) {
+    console.log(`LAN (iPhone): http://${ips[0]}:${port}`);
+  } else {
+    console.log("(no LAN IPv4 found — iPhone may not reach this server)");
+  }
 });

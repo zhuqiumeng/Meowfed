@@ -213,8 +213,22 @@ function createCloudSync({ adapter, cloudRepo, localRepo, outbox, now, onLocalCh
         assets: assetResult
       };
     } catch (error) {
-      setState({ phase: "error", error: String(error.message || error) });
-      return { ok: false, error: String(error.message || error) };
+      // v1.1.4 debug: 暴露 push 真错到 globalThis + DOM,1.5s 闪过的 toast 看不到全栈
+      const msg = String(error.message || error);
+      const stack = String(error.stack || "");
+      try { globalThis.__PUSH_FIRST_TIME_ERROR__ = msg; globalThis.__PUSH_FIRST_TIME_STACK__ = stack; } catch {}
+      try {
+        let dom = document.getElementById("__push-first-time-error__");
+        if (!dom) {
+          dom = document.createElement("pre");
+          dom.id = "__push-first-time-error__";
+          dom.style.cssText = "position:fixed;top:0;left:0;right:0;background:#fee;color:#c00;padding:6px;font-size:11px;z-index:99999;white-space:pre-wrap;word-break:break-all;font-family:monospace;";
+          (document.body || document.documentElement).appendChild(dom);
+        }
+        dom.textContent = "[pushFirstTime] " + msg + "\n" + stack;
+      } catch {}
+      setState({ phase: "error", error: msg });
+      return { ok: false, error: msg };
     }
   }
 

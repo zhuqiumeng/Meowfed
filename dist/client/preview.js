@@ -900,10 +900,12 @@ function renderCloudSyncCard() {
   // 但保留 JSON 导出/导入作为"高级 — 跨环境迁移"按钮（不显眼）。
   const cs = dataStore.cloudSync;
   const sdkReady = dataStore.isCloudBaseSdkAvailable();
+  // v1.1.4 调试: 把 bootstrap 错误从 data-store 拉到卡片上
+  const bootstrapError = (typeof window !== "undefined" && window.__CLOUDBASE_BOOTSTRAP_ERROR__) || null;
   const state = cs
     ? cs.getState()
     : sdkReady
-      ? { phase: "error", error: "云端连接初始化失败" }
+      ? { phase: "error", error: bootstrapError || "云端连接初始化失败" }
       : { phase: "no-sdk" };
   const phaseLabel = {
     "no-sdk": "SDK 未加载",
@@ -920,7 +922,8 @@ function renderCloudSyncCard() {
   if (state.phase === "no-sdk") {
     hint = "CloudBase SDK 未加载，云端同步暂不可用。";
   } else if (state.phase === "error") {
-    hint = (state.error || "网络或权限问题") + "。本地数据仍可用，云端会在重连后自动恢复。";
+    const errMsg = state.error || bootstrapError || (typeof window !== "undefined" && window.__CLOUDBASE_BOOTSTRAP_ERROR__) || "网络或权限问题";
+    hint = errMsg + "。本地数据仍可用，云端会在重连后自动恢复。";
   } else if (state.phase === "connecting" || state.phase === "idle") {
     hint = "首次连接中，约 2-5 秒。";
   } else if (state.phase === "ready") {

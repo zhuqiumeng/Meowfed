@@ -340,6 +340,18 @@
 
   function loadCloudBaseModules() {
     const modules = {};
+    // v1.1.4-fix: 浏览器 esbuild bundle 走 globalThis 挂载路径;Node 端走 require。
+    // 之前 esbuild 把 require 也 inline,导致 tryCreateCloudBootstrap 调不到 createCloudBaseAdapter。
+    // 这里把两条路都保留,但浏览器只走 globalThis(更直接,避开 esbuild lazy require 的坑)。
+    const isNode = typeof module !== "undefined" && module.exports;
+    if (!isNode) {
+      modules.adapterMod = globalThis.CatEatCloudBaseAdapter;
+      modules.cloudRepoMod = globalThis.CatEatCloudRepository;
+      modules.outboxMod = globalThis.CatEatOutbox;
+      modules.syncRepoMod = globalThis.CatEatSyncRepository;
+      modules.cloudSyncMod = globalThis.CatEatCloudSync;
+      return modules;
+    }
     if (typeof require === "function") {
       try {
         modules.adapterMod = require("./adapters/cloudbase-adapter");
@@ -356,13 +368,6 @@
       try {
         modules.cloudSyncMod = require("./cloud-sync");
       } catch (error) {/* ignore */}
-    }
-    if (globalThis) {
-      modules.adapterMod = modules.adapterMod || globalThis.CatEatCloudBaseAdapter;
-      modules.cloudRepoMod = modules.cloudRepoMod || globalThis.CatEatCloudRepository;
-      modules.outboxMod = modules.outboxMod || globalThis.CatEatOutbox;
-      modules.syncRepoMod = modules.syncRepoMod || globalThis.CatEatSyncRepository;
-      modules.cloudSyncMod = modules.cloudSyncMod || globalThis.CatEatCloudSync;
     }
     return modules;
   }
@@ -407,7 +412,29 @@
   function createMigrator(repo) {
     return async function migrate(participantHint) {
       const migration = await repo.find("meta", META_KEYS.migration);
-      if (migration && migration.status === "complete") {
+      // v1.1.4-fix: migration 信息塞 value JSONB(兼容 PG meta 表只有 key+value 两列)
+      // 兼容旧 IDB 里存的扁平格式(status/source/completedAt 是顶层字段而非 value 内)
+      const isComplete = migration && (
+        (migration.value && migration.value.status === "complete") ||
+        (!migration.value && migration.status === "complete") // 兼容 v1.1.3 之前扁平记录
+      );
+      if (isComplete) {
+        // 如果是旧扁平格式,迁到新 value JSONB 格式(让云端能 push)
+        if (migration && migration.status === "complete" && !migration.value) {
+          await repo.runTransaction(({ meta }) => {
+            meta.put({
+              key: META_KEYS.migration,
+              value: {
+                status: migration.status,
+                source: migration.source,
+                importedFoods: migration.importedFoods,
+                importedResults: migration.importedResults,
+                importedAssets: migration.importedAssets,
+                completedAt: migration.completedAt
+              }
+            });
+          });
+        }
         cleanupLegacyStorage();
         return migration;
       }
@@ -418,12 +445,14 @@
         await repo.runTransaction(({ meta }) => {
           meta.put({
             key: META_KEYS.migration,
-            status: "complete",
-            source: "localStorage-v2",
-            importedFoods: 0,
-            importedResults: 0,
-            importedAssets: 0,
-            completedAt
+            value: {
+              status: "complete",
+              source: "localStorage-v2",
+              importedFoods: 0,
+              importedResults: 0,
+              importedAssets: 0,
+              completedAt
+            }
           });
         });
         return repo.find("meta", META_KEYS.migration);
@@ -590,12 +619,14 @@
       await repo.runTransaction(({ meta }) => {
         meta.put({
           key: META_KEYS.migration,
-          status: "complete",
-          source: "localStorage-v2",
-          importedFoods: foods.length,
-          importedResults: results.length,
-          importedAssets: assets.length,
-          completedAt
+          value: {
+            status: "complete",
+            source: "localStorage-v2",
+            importedFoods: foods.length,
+            importedResults: results.length,
+            importedAssets: assets.length,
+            completedAt
+          }
         });
       });
       cleanupLegacyStorage();
@@ -680,6 +711,26 @@
             service.setRepo(syncRepo);
           }
         } catch (error) {
+          // v1.1.4 debug: 暴露错误到 window + DOM 方便排查
+          try {
+            const msg = (error && error.message) || String(error);
+            globalThis.__CLOUDBASE_BOOTSTRAP_ERROR__ = msg;
+            globalThis.__CLOUDBASE_BOOTSTRAP_STACK__ = (error && error.stack) || "";
+            if (typeof console !== "undefined" && console.error) {
+              console.error("[data-store] CloudBase bootstrap failed:", error);
+            }
+            // 也写到 DOM,给没 console 的环境用
+            try {
+              let dom = document.getElementById("__cloudbase-bootstrap-error__");
+              if (!dom) {
+                dom = document.createElement("pre");
+                dom.id = "__cloudbase-bootstrap-error__";
+                dom.style.cssText = "position:fixed;top:0;left:0;right:0;background:#fee;color:#c00;padding:6px;font-size:11px;z-index:99999;white-space:pre-wrap;word-break:break-all;font-family:monospace;";
+                (document.body || document.documentElement).appendChild(dom);
+              }
+              dom.textContent = "[cloudbase bootstrap] " + msg;
+            } catch {}
+          } catch {}
           cloudBootstrap = null;
         }
       }
@@ -894,8 +945,10 @@
       throw new Error("IndexedDB is unavailable");
     }
     const { service, cloudBootstrap: bootstrap } = buildIndexedDBService();
-    await service.initialize(context);
+    // v1.1.4 debug: 先把 cloudBootstrap 装到 module-level,即使 service.initialize 后面
+    // 抛错让流程掉到 legacy,ds.cloudSync 还能拿到,云端异步 push 才能继续。
     cloudBootstrap = bootstrap || null;
+    await service.initialize(context);
     // v1.1.4：CloudBase 走 PostgreSQL（PostgREST 协议），5 张表已建好，
     // 云同步默认开启 — user 上次明确要求"上云不丢"，不要再用本地兜底。
     // 即使 SDK 写失败，outbox 会把操作排队重试，本地 IndexedDB 数据流

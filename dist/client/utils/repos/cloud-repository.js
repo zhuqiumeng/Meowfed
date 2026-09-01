@@ -25,6 +25,28 @@
 
 const KNOWN_COLLECTIONS = ["meta", "cats", "foods", "results", "assets"];
 
+// v1.1.4-fix: IDB 字段名是 camelCase,PG 列名是 snake_case
+// 通用转换(只改一层 key,递归 nested object/array 不动)
+function camelToSnakeKeys(obj) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const out = {};
+  for (const k of Object.keys(obj)) {
+    const snake = k.replace(/([A-Z])/g, (m) => "_" + m.toLowerCase());
+    out[snake] = obj[k];
+  }
+  return out;
+}
+
+function snakeToCamelKeys(obj) {
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return obj;
+  const out = {};
+  for (const k of Object.keys(obj)) {
+    const camel = k.replace(/_([a-z])/g, (m, c) => c.toUpperCase());
+    out[camel] = obj[k];
+  }
+  return out;
+}
+
 function createCloudRepository(adapter) {
   if (!adapter || adapter.kind !== "cloudbase") {
     throw new Error("CloudRepository requires a CloudBaseAdapter");
@@ -115,7 +137,10 @@ function createCloudRepository(adapter) {
         const records = Array.isArray(snapshot[name]) ? snapshot[name] : [];
         await adapter.clear(name);
         if (records.length > 0) {
-          await adapter.bulkPut(name, records);
+          // v1.1.4-fix: IDB 字段是 camelCase,PG 列名是 snake_case
+          // 通用 camelCase → snake_case 转换,避免每个列名都要手写映射
+          const normalized = records.map((r) => camelToSnakeKeys(r));
+          await adapter.bulkPut(name, normalized);
         }
       }
       return { pushed: KNOWN_COLLECTIONS.map((c) => ({ collection: c, count: (snapshot[c] || []).length })) };
@@ -123,9 +148,11 @@ function createCloudRepository(adapter) {
 
     async pullSnapshot() {
       // 拉取该 _openid 下的所有 collection
+      // v1.1.4-fix: PG 端列名是 snake_case,转回 camelCase 给上层(保持 IDB 契约)
       const snapshot = {};
       for (const name of KNOWN_COLLECTIONS) {
-        snapshot[name] = await adapter.getAll(name);
+        const rows = await adapter.getAll(name);
+        snapshot[name] = (rows || []).map((r) => snakeToCamelKeys(r));
       }
       return snapshot;
     },

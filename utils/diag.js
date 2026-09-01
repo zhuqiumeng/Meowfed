@@ -353,11 +353,63 @@
       configDefaultEnv: globalThis.CatEatCloudBaseConfig ? globalThis.CatEatCloudBaseConfig.DEFAULT_ENV : "no-config",
       typeofRequire: typeof require,
       typeofDocument: typeof document,
-      globalThisKeys: Object.keys(globalThis).filter(k => k.startsWith("CatEat") || k.startsWith("__CLOUDBASE"))
+      globalThisKeys: Object.keys(globalThis).filter(k => k.startsWith("CatEat") || k.startsWith("__CLOUDBASE")),
+      cbAdapterType: typeof globalThis.CatEatCloudBaseAdapter,
+      cbAdapterJson: (() => {
+        try { return globalThis.CatEatCloudBaseAdapter ? JSON.stringify(Object.keys(globalThis.CatEatCloudBaseAdapter)) : "null"; } catch (e) { return "err: " + e.message; }
+      })(),
+      cbAdapterMethods: (() => {
+        try { return globalThis.CatEatCloudBaseAdapter && Object.getOwnPropertyNames(globalThis.CatEatCloudBaseAdapter).slice(0, 5); } catch (e) { return "err"; }
+      })(),
+      bootstrapError: globalThis.__CLOUDBASE_BOOTSTRAP_ERROR__ || null,
+      appType: (() => {
+        try {
+          const sdk = globalThis.cloudbase;
+          if (!sdk || typeof sdk.init !== "function") return "no-sdk";
+          const a = sdk.init({ env: "meowfed-d8gc79bfpabac02b3" });
+          return {
+            keys: Object.keys(a).slice(0, 20),
+            hasRdb: typeof a.rdb,
+            hasMysql: typeof a.mysql,
+            hasDatabase: typeof a.database,
+            hasStorage: typeof a.storage,
+            hasUploadFile: typeof a.uploadFile,
+          };
+        } catch (e) { return "init-err: " + e.message; }
+      })(),
+      rdbTest: "pending",
+      authTest: "pending"
     };
-    if (ds.cloudSync && typeof ds.cloudSync.getState === "function") {
-      out.cloudSyncState = dataStore.cloudSync.getState();
-    }
+    // 异步执行
+    (async () => {
+      try {
+        const sdk = globalThis.cloudbase;
+        if (!sdk || typeof sdk.init !== "function") throw new Error("no-sdk");
+        const a = sdk.init({ env: "meowfed-d8gc79bfpabac02b3" });
+        const r = await a.rdb({ database: "public" }).from("meta").select("*").limit(1);
+        out.rdbTest = { data: r.data, error: r.error ? { code: r.error.code, message: r.error.message } : null, status: r.status };
+      } catch (e) { out.rdbTest = "rdb-err: " + (e.message || String(e)); }
+      try {
+        const sdk2 = globalThis.cloudbase;
+        const a2 = sdk2.init({ env: "meowfed-d8gc79bfpabac02b3" });
+        if (typeof a2.auth !== "function") throw new Error("no-auth");
+        const auth = a2.auth();
+        const r2 = await auth.signInAnonymously();
+        out.authTest = { ok: true, keys: r2 ? Object.keys(r2).slice(0, 8) : null, user: r2 && r2.user ? Object.keys(r2.user).slice(0, 8) : null };
+      } catch (e) { out.authTest = "auth-err: " + (e.message || String(e)); }
+      // v1.1.4-debug: 保留 buildIndexedDBService 真错误,不被后续 "no-throw" 覆盖
+      out.realBootstrapError = globalThis.__CLOUDBASE_BOOTSTRAP_ERROR__ || null;
+      out.realBootstrapStack = globalThis.__CLOUDBASE_BOOTSTRAP_STACK__ || null;
+      try {
+        // 重现 tryCreateCloudBootstrap 逻辑
+        const a3 = globalThis.cloudbase.init({ env: "meowfed-d8gc79bfpabac02b3" });
+        globalThis.CatEatCloudBaseAdapter.createCloudBaseAdapter({ app: a3, env: "meowfed-d8gc79bfpabac02b3" });
+        out.bootstrapError = "no-throw";
+      } catch (e) { out.bootstrapError = "bootstrap-err: " + (e.message || String(e)); }
+      const outEl = document.querySelector("[data-diag-out='cloudsync']");
+      if (outEl) outEl.textContent = JSON.stringify(out, null, 2);
+    })();
+    // 立即返回 out（包含 pending 占位），异步执行完成后会重写 DOM
     return safeStringify(out);
   }
 
