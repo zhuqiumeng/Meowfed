@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
-// v1.1.4 PG 数据层 — 用主账号 secretId/Key 拿 admin token,调
-// POST /v1/rdb/exec-pgsql 跑 DDL(单条/逐次,不走 DO 包装因为主账号是 BYPASSRLS)
+// v1.1.4 PG 数据层 — 用 CAM 子账号 secretId/Key 拿 admin token,调
+// POST /v1/rdb/exec-pgsql 跑 DDL(单条/逐次,不走 DO 包装因为 cloudbase_postgres 是 BYPASSRLS)
 //
-// 🚨 主账号密钥,用完必须立刻禁用
-//    路径:腾讯云控制台 → CAM → API 密钥管理 → 找到这条 SecretId → 禁用
+// 🚨 历史: 2026-09-01 首次建表用主账号密钥跑完 23 条 DDL,密钥已禁用
+//   之后改用 CAM 子账号 + QcloudTCBFullAccess 策略
 //
 // 用法:
+//   export TENCENTCLOUD_SECRETID=<子账号 SecretId>
+//   export TENCENTCLOUD_SECRETKEY=<子账号 SecretKey>
 //   node tools/cat-eat-v114-pg-bootstrap.js
-//   node tools/cat-eat-v114-pg-bootstrap.js --verify
-//     (--verify 模式只验 5 张表已建好,不再重复建)
+//   node tools/cat-eat-v114-pg-bootstrap.js --verify  (只验 5 张表已建好)
 
 const fs = require('fs');
 const path = require('path');
@@ -22,8 +23,18 @@ const EXEC_PATH = '/v1/rdb/exec-pgsql';
 const DDL_PATH = '/tmp/cat-eat-v114-ddl.sql';
 const ROLE = 'cloudbase_postgres';
 
-const SECRET_ID = 'AKID_REDACTED';
-const SECRET_KEY = 'OdgXCsPjsphWFpBKOKAnDRSK1wxT2Qcc';
+// 🚨 走环境变量,不硬编码密钥。已禁用主账号 secretId/Key,改用 CAM 子账号(QcloudTCBFullAccess)
+// 配合 export TENCENTCLOUD_SECRETID / TENCENTCLOUD_SECRETKEY
+function readEnvSecret(name) {
+  const v = process.env[name];
+  if (!v) {
+    console.error(`❌ 缺环境变量 ${name},先 export TENCENTCLOUD_SECRETID / TENCENTCLOUD_SECRETKEY`);
+    process.exit(1);
+  }
+  return v;
+}
+const SECRET_ID = readEnvSecret('TENCENTCLOUD_SECRETID');
+const SECRET_KEY = readEnvSecret('TENCENTCLOUD_SECRETKEY');
 
 const app = init({ secretId: SECRET_ID, secretKey: SECRET_KEY, env: ENV_ID });
 
