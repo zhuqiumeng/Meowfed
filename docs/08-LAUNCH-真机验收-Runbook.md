@@ -169,5 +169,45 @@ git push origin agent/import-h5-app
 - 新 bug：先看 DevTools console 截图 + 复现路径，发到 Meowfed repo issues
 - 紧急：直接找 Mavis（Mavis session log 在本机 .minimax）
 
-> 文档版本：v1.1.1 / 2026-08-24
+> 文档版本：v1.1.4 / 2026-09-01
 > 维护人：lulu
+
+---
+
+## 8. v1.1.4 公测版真机验收（云同步默认开 + PG 数据层）
+
+> **背景**：v1.1.3 默认关云同步（PG schema 还没建），v1.1.4 把 CloudBase 切到
+> **PostgreSQL（PostgREST 协议）**，5 张表（meta/cats/foods/results/assets）已建好
+> + 9 indexes + 5 RLS `anon_all` policy，云同步默认开启。
+>
+> **链路核心**：浏览器 → app.rdb() PostgREST → CloudBase gateway → PostgreSQL `pgdb-ioy12otz`
+>
+> **不要再走 JSON 导出/导入当主路径**（那是 v1.1.3 临时方案）。v1.1.4 是"上云不丢"主路径。
+
+准备：iPhone Safari / PWA 打开 `https://zhuqiumeng.github.io/Meowfed/`，或 Mac Chrome 打开
+`http://127.0.0.1:4173/`。
+
+| # | 操作 | 预期 |
+| --- | --- | --- |
+| 1 | 首次打开（fresh IDB） | 「云同步」卡片显示「已同步」（不是"准备中…"也不是"连接出错"），副标题"数据自动备份到云端。换设备登录同一账号可同步" |
+| 2 | 加 1 猫 + 1 食物 | 卡片显示 1 条食物；云同步卡片无变化（写本地不需联网） |
+| 3 | 点「立即上传到云」 | Toast「已上传 N 条食物到云」+ 卡片下方副标题"最近一次同步：<时间>" |
+| 4 | （iPhone 端用 4G/不同网络，Mac Chrome 也行）打开 gitpage URL | 自动从云拉回 5 张表（meta/cats/foods/results/assets），首页显示同样的 1 猫 1 食物（这是"换设备不丢"的核心场景） |
+| 5 | 在第 2 步的设备上再点「立即上传到云」 | Toast「云端已有数据，请先在另一台设备执行『从云恢复』」（保护机制，避免覆盖） |
+| 6 | （可选）到 https://console.cloud.tencent.com/tcb 看 PG | `pgdb-ioy12otz` 的 5 张表应该看到刚才上传的 1 cat + 1 food |
+
+**已知小毛病（v1.1.4 已知）**：
+- 全新 IDB 启动时 30s outbox retry 会偶发「N 条 outbox 推送失败」Toast；30s 后自动重试
+  通常就好。原因是 ensureDefaults 写 meta 表跟 outbox flush 时序有竞态；不阻塞主流程。
+- iOS PWA IndexedDB 在低存储空间 / Safari 7-day eviction 仍可能丢；**JSON 备份/导入保留**
+  作为"极端情况兜底"（卡片底部"高级"折叠区里）。
+
+**对比 v1.1.3 的关键变化**：
+- ✅ 云同步**默认开**，不再需要手动点"开启云同步"
+- ✅ 5 张 PG 表持久化数据，**换设备自动同步**（满足"上云不丢"）
+- ✅ 资产（照片 blob）走 `app.storage()` → CloudBase 云存储，pullFromCloud 时自动拉回
+- ✅ 出网错时 UI 显示真实错误（不是硬编码"云端连接初始化失败"）
+
+**回滚**：见 §6 流程，`main` 改成 `git revert <bad-commit>` 后 push 即可。
+
+

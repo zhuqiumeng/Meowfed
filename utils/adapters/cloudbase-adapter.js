@@ -113,6 +113,37 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
     return app.rdb({ database: "public" });
   }
 
+  // v1.1.4-hotfix: 把 IDB 业务 record 转成 PG 兼容 row。
+  // put / bulkPut 都要走这条路径(之前 put 路径漏了,outbox 走 put 时 3 条 meta
+  // 全部 date/time out of range 失败)。
+  function decorateRow(storeName, record) {
+    let copy = camelToSnakeKeys({ ...record });
+    delete copy._id;
+    delete copy._openid;
+    delete copy.schema_version;
+    // IDB 时间戳是 Unix ms (number),PG 是 TIMESTAMPTZ → ISO string
+    for (const k of ["created_at", "updated_at", "manual_retry_after", "completed_at"]) {
+      if (typeof copy[k] === "number" && copy[k] > 0) {
+        copy[k] = new Date(copy[k]).toISOString();
+      }
+    }
+    // owner_id 是 NOT NULL,IDB 没填时默认 "anonymous"
+    if (copy.owner_id == null && storeName !== "meta") {
+      copy.owner_id = "anonymous";
+    }
+    // meta 表 PG schema 只有 key + value 两列;旧 IDB 扁平字段全塞 value JSONB
+    if (storeName === "meta") {
+      const key = copy.key;
+      let value = copy.value;
+      if (value == null) {
+        value = { ...copy };
+        delete value.key;
+      }
+      return { key, value };
+    }
+    return copy;
+  }
+
   function undecorate(row) {
     if (!row) return row;
     const copy = { ...row };
@@ -218,11 +249,7 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
         if (record[idCol] == null && record.id == null && record.key == null) {
           throw new Error("Record must have id or key for CloudBase.put");
         }
-        // v1.1.4-fix: IDB 字段 camelCase → PG 列 snake_case;schemaVersion strip
-        const row = camelToSnakeKeys({ ...record });
-        delete row._id;
-        delete row._openid;
-        delete row.schema_version;
+        const row = decorateRow(storeName, record);
         const { error } = await rdb().from(storeName).upsert([row]);
         if (error) throw error;
         return record;
@@ -234,37 +261,7 @@ function createCloudBaseAdapter({ app, env, storageRoot }) {
     async bulkPut(storeName, records) {
       if (!Array.isArray(records) || records.length === 0) return;
       // PostgREST 支持批量 insert/upsert；一次写一批
-      const rows = records.map((r) => {
-        // v1.1.4-fix: IDB 字段 camelCase → PG 列 snake_case(对 meta 表先做 value 包封再转)
-        let copy = camelToSnakeKeys({ ...r });
-        delete copy._id;
-        delete copy._openid;
-        // v1.1.4-fix: schemaVersion 是 IDB 内部元数据,PG 表没这列,strip
-        delete copy.schema_version;
-        // v1.1.4-fix: IDB 时间戳是 Unix ms (number),PG 是 TIMESTAMPTZ → ISO string
-        for (const k of ["created_at", "updated_at", "manual_retry_after", "completed_at"]) {
-          if (typeof copy[k] === "number" && copy[k] > 0) {
-            copy[k] = new Date(copy[k]).toISOString();
-          }
-        }
-        // v1.1.4-fix: owner_id 是 NOT NULL,IDB 没填时默认 "anonymous"
-        if (copy.owner_id == null && storeName !== "meta") {
-          copy.owner_id = "anonymous";
-        }
-        // v1.1.4-fix: meta 表 PG schema 只有 key + value 两列;旧 IDB 里的迁移记录
-        // 仍可能带 status/source/completedAt 等扁平字段 — 全部塞进 value JSONB
-        if (storeName === "meta") {
-          const key = copy.key;
-          let value = copy.value;
-          if (value == null) {
-            // 旧记录(扁平字段)塞进 value
-            value = { ...copy };
-            delete value.key;
-          }
-          return { key, value };
-        }
-        return copy;
-      });
+      const rows = records.map((r) => decorateRow(storeName, r));
       try {
         const { error } = await rdb().from(storeName).upsert(rows);
         if (error) throw error;
