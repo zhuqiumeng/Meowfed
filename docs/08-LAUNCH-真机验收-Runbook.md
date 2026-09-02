@@ -169,7 +169,7 @@ git push origin agent/import-h5-app
 - 新 bug：先看 DevTools console 截图 + 复现路径，发到 Meowfed repo issues
 - 紧急：直接找 Mavis（Mavis session log 在本机 .minimax）
 
-> 文档版本：v1.1.4 / 2026-09-01
+> 文档版本：v1.1.4-hotfix-2 / 2026-09-02
 > 维护人：lulu
 
 ---
@@ -189,16 +189,34 @@ git push origin agent/import-h5-app
 
 | # | 操作 | 预期 |
 | --- | --- | --- |
-| 1 | 首次打开（fresh IDB） | 「云同步」卡片显示「已同步」（不是"准备中…"也不是"连接出错"），副标题"数据自动备份到云端。换设备登录同一账号可同步" |
+| 1 | 首次打开（fresh IDB） | 「云同步」卡片显示「已同步」（不是"准备中…"也不是"连接出错"），副标题"数据自动备份到云端。换设备登录同一账号可同步"。**首页 < 1s 看到 IDB 数据**（v36 fix：cloudSync.start fire-and-forget，service.initialize 完就 render，不再等 22 条 outbox 串行 flush） |
 | 2 | 加 1 猫 + 1 食物 | 卡片显示 1 条食物；云同步卡片无变化（写本地不需联网） |
 | 3 | 点「立即上传到云」 | Toast「已上传 N 条食物到云」+ 卡片下方副标题"最近一次同步：<时间>" |
-| 4 | （iPhone 端用 4G/不同网络，Mac Chrome 也行）打开 gitpage URL | 自动从云拉回 5 张表（meta/cats/foods/results/assets），首页显示同样的 1 猫 1 食物（这是"换设备不丢"的核心场景） |
+| 4 | （iPhone 端用 4G/不同网络，Mac Chrome 也行）打开 gitpage URL | 自动从云拉回 5 张表（meta/cats/foods/results/assets），首页 < 1s 显示同样的 1 猫 1 食物（这是"换设备不丢"的核心场景） |
 | 5 | 在第 2 步的设备上再点「立即上传到云」 | Toast「云端已有数据，请先在另一台设备执行『从云恢复』」（保护机制，避免覆盖） |
 | 6 | （可选）到 https://console.cloud.tencent.com/tcb 看 PG | `pgdb-ioy12otz` 的 5 张表应该看到刚才上传的 1 cat + 1 food |
 
+**v1.1.4-hotfix-2 修的"刷新丢数据"假 bug**（commit `4c4499e` / 2026-09-02）：
+
+之前 user 反馈"加食物成功，刷新页面内容被清除了"——实际**数据没丢**，但
+`tryInitialize` 还在 `await cloudSync.start()`，fresh IDB 22 条 outbox
+串行 flush 把 bootstrap 拉慢到 5+ 秒。user 在这 5 秒看到的是
+"Hi 噜噜 还没有最近记录"骨架，误以为数据被清了。
+
+v1.1.4-hotfix-2 修法：
+- `tryInitialize` 把 `cloudSync.start()` 改成 fire-and-forget
+  （catch error 走 console.warn），`service.initialize` 完就 resolve
+- CACHE_NAME v35-skeleton → v36-data-immediate 强制 SW 刷掉老 data-store.js
+- preview/index.html cache busting `v=35` → `v=36`
+
+效果：刷新后 < 1s 看到 5 条 demo 数据（之前 5+ 秒空白），云端 state 通过
+`cloudSync.subscribe` 异步更新到 UI。
+
 **已知小毛病（v1.1.4 已知）**：
-- 全新 IDB 启动时 30s outbox retry 会偶发「N 条 outbox 推送失败」Toast；30s 后自动重试
-  通常就好。原因是 ensureDefaults 写 meta 表跟 outbox flush 时序有竞态；不阻塞主流程。
+- 全新 IDB 启动时 30s outbox retry 会偶发「N 条 outbox 推送失败」Toast；
+  30s 后自动重试通常就好。原因是 ensureDefaults 写 meta 表跟 outbox flush
+  时序有竞态；**不阻塞主流程**（v36 fix 后首页 < 1s 出数据，云端 push 失败
+  不影响本地 UI）。
 - iOS PWA IndexedDB 在低存储空间 / Safari 7-day eviction 仍可能丢；**JSON 备份/导入保留**
   作为"极端情况兜底"（卡片底部"高级"折叠区里）。
 
