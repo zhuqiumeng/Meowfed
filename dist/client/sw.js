@@ -1,9 +1,13 @@
-const CACHE_NAME = "cat-eat-h5-v34";
+const CACHE_NAME = "cat-eat-h5-v35-skeleton";
+// v1.1.4-hotfix: 升 v34 → v35-skeleton 强制清掉老 iPhone PWA 缓存的旧 index.html
+// (旧版 bootstrap 在 await initialize 后才 render,fresh IDB 启动期页面空白 5+ 秒)
 const APP_ASSETS = [
   "./?screen=home",
-  "./preview.css?v=34",
-  "./preview.js?v=34",
+  "./preview.css?v=35",
+  "./preview.js?v=35",
   "./utils/rules.js",
+  "./utils/cloudbase-config.js",
+  "./utils/cloudbase-sdk.js",
   "./utils/data-store.js",
   "./manifest.webmanifest",
   "./assets/cat-profile-default.jpg",
