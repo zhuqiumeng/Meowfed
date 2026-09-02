@@ -229,10 +229,36 @@ function createDataService(args) {
     let photoAssetId =
       (existing && existing.photoAssetId) || input.photoAssetId || null;
 
+    // v1.1.4-hotfix-3: 诊断 iPhone PWA "拍照+写产品名" saveFood 失败的根因。
+    // user 反馈"提示数据或照片暂时无法保存"但表单值还在,看起来像成功。
+    // 之前的 catch 只在 submitFood 里吃成通用 toast,根因被埋了。
+    // 现在每步 catch + log 实际 error 到 globalThis, iPhone 调试抽屉能拉到。
+    const diagLog = (stage, payload) => {
+      try {
+        const prev = globalThis.__CAT_EAT_SAVE_FOOD_DIAG__ || [];
+        prev.push({ at: Date.now(), stage, ...payload });
+        globalThis.__CAT_EAT_SAVE_FOOD_DIAG__ = prev.slice(-20);
+      } catch {}
+    };
+
+    let blob = null;
     if (options.photoDataUrl) {
-      const blob = dataUrlToBlob(options.photoDataUrl);
-      if (!blob) throw new Error("Unable to convert photo to Blob");
-      photoAssetId = await assetRepo.putFoodPhoto(catId, blob, photoAssetId);
+      try {
+        blob = dataUrlToBlob(options.photoDataUrl);
+      } catch (e) {
+        diagLog("dataUrlToBlob-throw", { error: e.message });
+        throw e;
+      }
+      if (!blob) {
+        diagLog("dataUrlToBlob-null", { dataUrlPrefix: String(options.photoDataUrl || "").slice(0, 40) });
+        throw new Error("Unable to convert photo to Blob");
+      }
+      try {
+        photoAssetId = await assetRepo.putFoodPhoto(catId, blob, photoAssetId);
+      } catch (e) {
+        diagLog("putFoodPhoto-fail", { catId, blobSize: blob.size, error: e.message, stack: e.stack });
+        throw e;
+      }
     }
 
     const record = normalizeFood(input, {
@@ -242,19 +268,29 @@ function createDataService(args) {
       timestamp: time()
     });
 
-    await activeRepo.runTransaction(({ foods, assets }) => {
-      foods.put(record);
-      if (
-        options.photoDataUrl &&
-        existing &&
-        existing.photoAssetId &&
-        existing.photoAssetId !== photoAssetId
-      ) {
-        assets.delete(existing.photoAssetId);
-      }
-    });
+    try {
+      await activeRepo.runTransaction(({ foods, assets }) => {
+        foods.put(record);
+        if (
+          options.photoDataUrl &&
+          existing &&
+          existing.photoAssetId &&
+          existing.photoAssetId !== photoAssetId
+        ) {
+          assets.delete(existing.photoAssetId);
+        }
+      });
+    } catch (e) {
+      diagLog("runTransaction-fail", { foodId, catId, photoAssetId, error: e.message, stack: e.stack });
+      throw e;
+    }
 
-    await refreshView();
+    try {
+      await refreshView();
+    } catch (e) {
+      diagLog("refreshView-fail", { foodId, error: e.message });
+      throw e;
+    }
     return getFood(foodId);
   }
 

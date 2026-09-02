@@ -1919,7 +1919,16 @@ async function submitFood(form) {
     route("detail", { id: food.id }, true);
     showToast(existing ? "修改已经保存" : "已经加入清单");
   } catch (error) {
-    showToast("照片或数据暂时没有保存成功");
+    // v1.1.4-hotfix-3: 把真实 error message 露到 toast,user 看到"object store
+    // not found"就知道是老 IDB 升级没跑/老 SW 没刷,而不是看到通用 toast 误以为
+    // 保存好了(因为表单值还在)。也存到 globalThis 方便调试抽屉拉到。
+    try {
+      const prev = globalThis.__CAT_EAT_SAVE_FOOD_ERRORS__ || [];
+      prev.push({ at: Date.now(), error: error && error.message, stack: error && error.stack });
+      globalThis.__CAT_EAT_SAVE_FOOD_ERRORS__ = prev.slice(-20);
+    } catch {}
+    const msg = String((error && error.message) || error || "未知错误");
+    showToast("保存失败：" + msg.slice(0, 60));
   }
 }
 
