@@ -969,19 +969,23 @@
     // 云同步默认开启 — user 上次明确要求"上云不丢"，不要再用本地兜底。
     // 即使 SDK 写失败，outbox 会把操作排队重试，本地 IndexedDB 数据流
     // 仍然独立可用。
+    //
+    // v1.1.4-hotfix: cloudSync.start 改成 fire-and-forget,不要 await。
+    // 之前 await 这步会让 bootstrap 等 5+ 秒(cloud 启动 + outbox flush 22 条串行),
+    // user 刷新后看到 "Hi 噜噜 还没有最近记录" 骨架 5+ 秒,误以为"刷新丢数据"。
+    // 实际上 IDB 数据好好的,只是 cloudSync 还没起来。
+    // 现在 start 跑在 background,失败也只是 console.warn + state.error,本地 UI 仍
+    // 能立即 render 真实数据。云端状态走 cloudSync.subscribe 异步更新到 UI。
     if (cloudBootstrap && cloudBootstrap.cloudSync && typeof cloudBootstrap.cloudSync.start === "function") {
-      try {
-        await cloudBootstrap.cloudSync.start();
-      } catch (error) {
-        // 起失败不阻塞本地 service；UI 看 cloudSync.getState() 知道详情
+      cloudBootstrap.cloudSync.start().catch((error) => {
         // eslint-disable-next-line no-console
         if (typeof console !== "undefined" && console.warn) {
           console.warn("[data-store] CloudSync.start() failed during init:", error && error.message);
         }
-      }
+      });
     }
     if (initError) {
-      // 把 service.initialize 的错抛出去让上层走 legacy,但 cloudSync.start() 已经跑过
+      // 把 service.initialize 的错抛出去让上层走 legacy,cloudSync.start() 已在 background 跑
       throw initError;
     }
     return service;

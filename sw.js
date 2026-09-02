@@ -1,10 +1,13 @@
-const CACHE_NAME = "cat-eat-h5-v35-skeleton";
-// v1.1.4-hotfix: 升 v34 → v35-skeleton 强制清掉老 iPhone PWA 缓存的旧 index.html
-// (旧版 bootstrap 在 await initialize 后才 render,fresh IDB 启动期页面空白 5+ 秒)
+const CACHE_NAME = "cat-eat-h5-v36-data-immediate";
+// v1.1.4-hotfix-2: 升 v35-skeleton → v36-data-immediate 强制刷掉老 data-store.js。
+// v35-skeleton 里有 runTransaction 修复,但 tryInitialize 还在 await cloudSync.start(),
+// 22 条 outbox 串行 flush 把 bootstrap 拉慢到 5+ 秒,user 刷新后看到 "Hi 噜噜 还没有
+// 最近记录" 骨架 5+ 秒误以为 "刷新丢数据"。v36 把 cloudSync.start 改 fire-and-forget,
+// service.initialize 完就 resolve,数据立即可见。
 const APP_ASSETS = [
   "./?screen=home",
-  "./preview.css?v=35",
-  "./preview.js?v=35",
+  "./preview.css?v=36",
+  "./preview.js?v=36",
   "./utils/rules.js",
   "./utils/cloudbase-config.js",
   "./utils/cloudbase-sdk.js",
