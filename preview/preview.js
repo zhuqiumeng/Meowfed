@@ -161,15 +161,36 @@ function escapeHtml(value = "") {
 }
 
 function createId() {
-  return dataStore.createUuid();
+  if (!dataStore || typeof dataStore.createUuid !== "function") {
+    return `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
+  try {
+    return dataStore.createUuid();
+  } catch (e) {
+    return `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  }
 }
 
 function readFoods() {
-  return dataStore.getFoods();
+  // v1.1.4-hotfix: bootstrap 第一次 render 时 dataStore 可能还没完成 initialize。
+  // 兜底返回空,避免骨架 render() throw 把整个 page 弄空白
+  if (!dataStore || typeof dataStore.getFoods !== "function") return [];
+  try {
+    return dataStore.getFoods();
+  } catch (e) {
+    return [];
+  }
 }
 
 function readCatProfile() {
-  return dataStore.getCatProfile();
+  if (!dataStore || typeof dataStore.getCatProfile !== "function") {
+    return { nickname: "", ageYears: null, photoPath: "" };
+  }
+  try {
+    return dataStore.getCatProfile();
+  } catch (e) {
+    return { nickname: "", ageYears: null, photoPath: "" };
+  }
 }
 
 function writeCatProfile(profile, options = {}) {
