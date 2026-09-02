@@ -133,25 +133,45 @@ function createIndexedDBAdapter({ indexedDB, DB_NAME, DB_VERSION, setupSchema })
     },
 
     // 跨 collection 事务：plan(stores) 同步写入；返回 stores 以便读。
+    //
+    // v1.1.4-hotfix: 过滤掉 IDB 中不存在的 store name。iPhone PWA IDB 可能
+    // 是 v1 schema(没 outbox store),如果硬传 storeNames 给 database.transaction
+    // 会抛 "The specified object store was not found" → saveFood 全部失败。
+    // 缺失的 store 给 no-op stub,plan 函数照常跑,只是这部分写丢失
+    // (cloud 镜像模式 + outbox 缺失的极端情况,本地 IDB 主体数据仍正常写入)。
     async runTransaction(storeNames, mode, plan) {
       if (!database) throw new Error("IndexedDBAdapter is not initialized");
-      const tx = database.transaction(storeNames, mode);
+      const available = (storeNames || []).filter((name) =>
+        database.objectStoreNames.contains(name)
+      );
+      const tx = database.transaction(available, mode);
       const stores = {};
-      for (const name of storeNames) {
-        const store = tx.objectStore(name);
-        stores[name] = {
-          get: (key) => requestValue(store.get(key)),
-          getAll: () => requestValue(store.getAll()),
-          put: (record) => {
-            store.put(record);
-          },
-          delete: (key) => {
-            store.delete(key);
-          },
-          clear: () => {
-            store.clear();
-          }
-        };
+      for (const name of storeNames || []) {
+        if (available.includes(name)) {
+          const store = tx.objectStore(name);
+          stores[name] = {
+            get: (key) => requestValue(store.get(key)),
+            getAll: () => requestValue(store.getAll()),
+            put: (record) => {
+              store.put(record);
+            },
+            delete: (key) => {
+              store.delete(key);
+            },
+            clear: () => {
+              store.clear();
+            }
+          };
+        } else {
+          // store 不存在 — 给 no-op stub,plan 调用不抛,只是写丢失
+          stores[name] = {
+            get: () => Promise.resolve(null),
+            getAll: () => Promise.resolve([]),
+            put: () => {},
+            delete: () => {},
+            clear: () => {}
+          };
+        }
       }
       plan(stores);
       await transactionDone(tx);
