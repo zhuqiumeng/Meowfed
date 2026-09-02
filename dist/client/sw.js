@@ -1,13 +1,13 @@
-const CACHE_NAME = "cat-eat-h5-v36-data-immediate";
-// v1.1.4-hotfix-2: 升 v35-skeleton → v36-data-immediate 强制刷掉老 data-store.js。
-// v35-skeleton 里有 runTransaction 修复,但 tryInitialize 还在 await cloudSync.start(),
-// 22 条 outbox 串行 flush 把 bootstrap 拉慢到 5+ 秒,user 刷新后看到 "Hi 噜噜 还没有
-// 最近记录" 骨架 5+ 秒误以为 "刷新丢数据"。v36 把 cloudSync.start 改 fire-and-forget,
-// service.initialize 完就 resolve,数据立即可见。
+const CACHE_NAME = "cat-eat-h5-v37-local-mode-ios";
+// v1.1.4-hotfix-3: 升 v36-data-immediate → v37-local-mode-ios 强制刷掉老 SW 缓存。
+// iPhone PWA / Safari 上 CloudBase 跨源 cookie 被 WKWebView ITP 拦截,
+// FetchError undefined,云同步走不通。新版在 iOS 上把云同步卡片换成
+// "本地模式"卡片,数据自动存本机 + 显眼的 iCloud Drive JSON 备份入口。
+// Mac / Windows Chrome 不受影响,继续走云同步。
 const APP_ASSETS = [
   "./?screen=home",
-  "./preview.css?v=36",
-  "./preview.js?v=36",
+  "./preview.css?v=37",
+  "./preview.js?v=37",
   "./utils/rules.js",
   "./utils/cloudbase-config.js",
   "./utils/cloudbase-sdk.js",

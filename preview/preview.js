@@ -911,9 +911,28 @@ function bindDiagActions() {
   }
 }
 
+function isLikelyIOS() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  if (/iPad|iPhone|iPod/.test(ua)) return true;
+  // iPad on Mac（新 iPadOS 桌面模式会显示为 MacIntel + 多点触控）
+  if (navigator.platform === "MacIntel"
+      && typeof navigator.maxTouchPoints === "number"
+      && navigator.maxTouchPoints > 1) return true;
+  return false;
+}
+
 function renderCloudSyncCard() {
   const dataStore = window.CatEatData;
   if (!dataStore) return "";
+
+  // v1.1.4-hotfix-3: iPhone / iPad PWA 上 CloudBase 跨源 cookie 被 WKWebView ITP
+  // 拦截,FetchError undefined,云同步走不通。这不是代码 bug,平台限制。
+  // 给 iOS user 一个干净的"本地模式"卡片:数据自动存本地 + 显眼的 iCloud
+  // Drive JSON 备份/恢复入口。Mac / Windows Chrome 继续走云同步。
+  if (isLikelyIOS()) {
+    return renderLocalModeCard();
+  }
 
   // v1.1.4：CloudBase 走 PostgreSQL（PostgREST 协议），5 张表已建好，RLS anon_all
   // 策略启用，data-store.initialize() 阶段已经默认启动 cloudSync.start()。
@@ -977,6 +996,30 @@ function renderCloudSyncCard() {
             <p class="home-cloud-advanced-hint">主要用于跨 env 迁移数据。日常使用云同步即可。</p>
           </div>
         </details>
+      </div>
+    </section>
+  `;
+}
+
+function renderLocalModeCard() {
+  // v1.1.4-hotfix-3: iOS PWA / Safari 上 CloudBase 跨源 cookie 走不通(SDK withCredentials
+  // 必带 cookie,WKWebView ITP 拦截,FetchError undefined)。给 user 一个干净的本地模式:
+  // 数据自动存本机,刷新/重启都不丢;想要跨设备就用"导出 JSON 备份"到 iCloud Drive
+  // (Files app 集成),新设备 PWA 里"从 iCloud Drive 导入 JSON"即可恢复。
+  return `
+    <section class="home-cloud-card home-cloud-card-local" aria-label="本地模式">
+      <header class="home-cloud-head">
+        <h3>本地模式</h3>
+        <span class="home-cloud-status" data-cloud-phase="local">数据自动存本机</span>
+      </header>
+      <p class="home-cloud-hint">iPhone PWA 当前不支持腾讯云跨源同步（平台限制），数据已自动存本机 IndexedDB，刷新 / 重启都不丢。</p>
+      <div class="home-cloud-actions home-cloud-actions-local">
+        <button type="button" class="cloud-button" data-backup-action="export">📤 导出 JSON 备份</button>
+        <label class="cloud-button cloud-button-secondary" style="display:inline-block;cursor:pointer">
+          📥 导入 JSON 恢复
+          <input id="cloud-import-input" type="file" accept="application/json,.json" style="display:none">
+        </label>
+        <p class="home-cloud-advanced-hint">想跨设备？在新设备的 PWA 里点「导入 JSON 恢复」选同一份备份文件即可。建议每周导出一次到 iCloud Drive 兜底。</p>
       </div>
     </section>
   `;
