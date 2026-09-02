@@ -2852,6 +2852,16 @@ window.addEventListener("popstate", () => {
 async function bootstrap() {
   const params = new URLSearchParams(location.search);
   const invite = params.get("invite");
+
+  // v1.1.4-hotfix: 先 render 一次骨架 UI,避免 IDB/cloudSync 启动慢时整个页面空白
+  // 之前 await dataStore.initialize() 会等 5+ 秒(fresh IDB + PG 认证 + outbox flush),
+  // 这期间 #app 一直空,user 看到的就是空白 + 右下 cs:connecting 调试块
+  if (params.get("screen") === "record") {
+    state.screen = "home";
+    history.replaceState(null, "", "?screen=home");
+  }
+  render();
+
   const storageStatus = await dataStore.initialize({
     participantId: invite ? `invite:${invite}` : ""
   });
@@ -2864,10 +2874,7 @@ async function bootstrap() {
     });
   }
 
-  if (params.get("screen") === "record") {
-    state.screen = "home";
-    history.replaceState(null, "", "?screen=home");
-  }
+  // IDB / cloudSync 初始化完后 re-render 拿真实数据
   render();
 
   if (storageStatus.mode === "legacy-fallback") {
